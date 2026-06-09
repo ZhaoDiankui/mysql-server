@@ -6868,7 +6868,6 @@ static int init_server_components() {
   /*
     Set the default storage engines
   */
-
   if (initialize_storage_engine(default_storage_engine, "",
                                 &global_system_variables.table_plugin))
     unireg_abort(MYSQLD_ABORT_EXIT);
@@ -11215,7 +11214,6 @@ static int get_options(int *argc_ptr, char ***argv_ptr) {
 #ifndef _WIN32
   if (mysqld_chroot) set_root(mysqld_chroot);
 #endif
-
   if (fix_paths()) return 1;
 
   /*

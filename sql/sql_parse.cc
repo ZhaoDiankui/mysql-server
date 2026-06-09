@@ -2479,7 +2479,6 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
   }
 
 done:
-
   assert(thd->open_tables == nullptr ||
          (thd->locked_tables_mode == LTM_LOCK_TABLES));
 

@@ -6002,7 +6002,6 @@ int MYSQL_BIN_LOG::purge_logs(const char *to_log, bool included,
   bool exit_loop = false;
   LOG_INFO log_info;
   THD *thd = current_thd;
-  LOG_INFO last_persisted_log_info;
   DBUG_TRACE;
   DBUG_PRINT("info", ("to_log= %s", to_log));
 
@@ -8759,7 +8758,6 @@ void MYSQL_BIN_LOG::process_commit_stage_queue(THD *thd, THD *first) {
     assert(head->commit_error != THD::CE_COMMIT_ERROR);
     Thd_backup_and_restore switch_thd(thd, head);
     bool all = head->get_transaction()->m_flags.real_commit;
-
     assert(!head->get_transaction()->m_flags.commit_low ||
            head->get_transaction()->m_flags.ready_preempt);
     ::finish_transaction_in_engines(head, all, false);
@@ -8951,7 +8949,6 @@ int MYSQL_BIN_LOG::finish_commit(THD *thd) {
   }
 #endif
   assert(thd->commit_error != THD::CE_COMMIT_ERROR);
-
   ::finish_transaction_in_engines(thd, all, false);
 
   // If the ordered commit didn't updated the GTIDs for this thd yet

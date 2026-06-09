@@ -6324,11 +6324,9 @@ int Xid_apply_log_event::do_apply_event(Relay_log_info const *rli) {
                       rli_ptr->get_group_master_log_pos(),
                       rli_ptr->get_group_relay_log_name(),
                       rli_ptr->get_group_relay_log_pos()));
-
   mysql_mutex_unlock(&rli_ptr->data_lock);
   error = do_commit(thd);
   mysql_mutex_lock(&rli_ptr->data_lock);
-
   if (error) {
     rli->report(ERROR_LEVEL, thd->get_stmt_da()->mysql_errno(),
                 "Error in Xid_log_event: Commit could not be completed, '%s'",

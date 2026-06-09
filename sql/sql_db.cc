@@ -298,7 +298,7 @@ static void set_db_default_charset(const THD *thd,
     create_info->default_table_charset = thd->variables.collation_server;
   } else {
     if (!(create_info->used_fields & HA_CREATE_USED_DEFAULT_COLLATE) &&
-        create_info->default_table_charset == &my_charset_utf8mb4_0900_ai_ci) {
+        create_info->default_table_charset == &my_charset_utf8mb4_0900_ai_ci)
       create_info->default_table_charset =
           thd->variables.default_collation_for_utf8mb4;
   }

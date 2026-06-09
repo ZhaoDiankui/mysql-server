@@ -204,7 +204,6 @@ enum enum_alter_inplace_result {
   HA_ALTER_INPLACE_INSTANT
 };
 
-
 /* Bits in table_flags() to show what database can do */
 
 #define HA_NO_TRANSACTIONS (1 << 0)     /* Doesn't support transactions */

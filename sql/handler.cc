@@ -7976,8 +7976,6 @@ int handler::ha_reset() {
   return retval;
 }
 
-
-
 int handler::ha_write_row(uchar *buf) {
   int error;
   Log_func *log_func = Write_rows_log_event::binlog_row_logging_function;
@@ -7987,7 +7985,6 @@ int handler::ha_write_row(uchar *buf) {
   DBUG_EXECUTE_IF("inject_error_ha_write_row", return HA_ERR_INTERNAL_ERROR;);
   DBUG_EXECUTE_IF("simulate_storage_engine_out_of_memory",
                   return HA_ERR_SE_OUT_OF_MEMORY;);
-
   mark_trx_read_write();
 
   DBUG_EXECUTE_IF(
@@ -8772,7 +8769,6 @@ void ha_post_recover(void) {
   (void)plugin_foreach(nullptr, post_recover_handlerton,
                        MYSQL_STORAGE_ENGINE_PLUGIN, nullptr);
 }
-
 
 void handler::ha_set_primary_handler(handler *primary_handler) {
   assert((ht->flags & HTON_IS_SECONDARY_ENGINE) != 0);

@@ -2402,7 +2402,6 @@ bool Relay_log_info::write_info(Rpl_info_handler *to) {
           m_assign_gtids_to_anonymous_transactions_info.get_value().c_str())) {
     return true; /* purecov: inspected */
   }
-
   return false;
 }
 

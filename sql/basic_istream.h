@@ -140,6 +140,7 @@ class IO_CACHE_istream : public Basic_seekable_istream {
      Get the length of the file.
   */
   my_off_t length() override;
+  
  private:
   IO_CACHE m_io_cache;
 };

@@ -650,6 +650,21 @@ bool start_slave(THD *thd) {
       }
     }
   }
+
+#ifdef WESQL_CLUSTER
+  if (is_consensus_replication_enabled() &&
+      is_consensus_replication_applier_running() &&
+      (thd->lex->slave_thd_opt &&
+       (thd->lex->slave_thd_opt & SLAVE_IO) != SLAVE_IO)) {
+    mi = channel_map.get_mi(
+        channel_map.get_consensus_replication_applier_channel());
+    assert(mi && Master_info::is_configured(mi));
+    if (start_slave(thd, &thd->lex->slave_connection, &thd->lex->mi,
+                    thd->lex->slave_thd_opt, mi, true))
+      return true;
+  }
+#endif
+
   if (!error) {
     /* no error */
     my_ok(thd);
@@ -696,6 +711,24 @@ int stop_slave(THD *thd) {
       }
     }
   }
+
+#ifdef WESQL_CLUSTER
+  // stop consensus channel STOP SLAVE SQL_THREAD
+  if (is_consensus_replication_enabled() &&
+      is_consensus_replication_applier_running() &&
+      (thd->lex->slave_thd_opt &&
+       (thd->lex->slave_thd_opt & SLAVE_IO) != SLAVE_IO)) {
+    mi = channel_map.get_mi(
+        channel_map.get_consensus_replication_applier_channel());
+    assert(mi && Master_info::is_configured(mi));
+    if (stop_slave(thd, mi, true, false /*for_one_channel*/,
+                   &push_temp_table_warning)) {
+      LogErr(ERROR_LEVEL, ER_RPL_REPLICA_CANT_STOP_REPLICA_FOR_CHANNEL,
+             mi->get_channel());
+      error = 1;
+    }
+  }
+#endif
 
   if (!error) {
     /* no error */
@@ -789,6 +822,26 @@ bool start_slave_cmd(THD *thd) {
                mi->get_channel());
       goto err;
     }
+
+#ifdef WESQL_CLUSTER
+    /*
+      For channel consensus_replication_applier we disable START SLAVE [IO_THREAD]
+      command.
+    */
+    if (mi && is_consensus_replication_enabled() &&
+        channel_map.is_consensus_replication_channel_name(mi->get_channel()) &&
+        (!is_consensus_replication_applier_running() ||
+         !thd->lex->slave_thd_opt || (thd->lex->slave_thd_opt & SLAVE_IO))) {
+      const char *command = "START SLAVE FOR CHANNEL";
+      if (thd->lex->slave_thd_opt & SLAVE_IO)
+        command = "START SLAVE IO_THREAD FOR CHANNEL";
+
+      my_error(ER_REPLICA_CHANNEL_OPERATION_NOT_ALLOWED, MYF(0), command,
+               mi->get_channel(), command);
+
+      goto err;
+    }
+#endif
 
     if (mi)
       res = start_slave(thd, &thd->lex->slave_connection, &thd->lex->mi,
@@ -889,6 +942,27 @@ bool stop_slave_cmd(THD *thd) {
       channel_map.unlock();
       return true;
     }
+
+#ifdef WESQL_CLUSTER
+    /*
+      For channel consensus_replication_applier we disable START SLAVE [IO_THREAD]
+      command.
+    */
+    if (mi && is_consensus_replication_enabled() &&
+        channel_map.is_consensus_replication_channel_name(mi->get_channel()) &&
+        (!is_consensus_replication_applier_running() ||
+         !thd->lex->slave_thd_opt || (thd->lex->slave_thd_opt & SLAVE_IO))) {
+      const char *command = "STOP SLAVE FOR CHANNEL";
+      if (thd->lex->slave_thd_opt & SLAVE_IO)
+        command = "STOP SLAVE SQL_THREAD FOR CHANNEL";
+
+      my_error(ER_REPLICA_CHANNEL_OPERATION_NOT_ALLOWED, MYF(0), command,
+               mi->get_channel(), command);
+
+      channel_map.unlock();
+      return true;
+    }
+#endif
 
     if (mi)
       res = stop_slave(thd, mi, true /*net report */, true /*for_one_channel*/,
@@ -2205,6 +2279,24 @@ void delete_slave_info_objects() {
       it->second = 0;
     }
   }
+
+#ifdef WESQL_CLUSTER
+  // Clean other types of channel
+  if (is_consensus_replication_enabled()) {
+    for (mi_map::iterator it = channel_map.begin(CONSENSUS_REPLICATION_CHANNEL);
+         it != channel_map.end(CONSENSUS_REPLICATION_CHANNEL); it++) {
+      mi = it->second;
+
+      if (mi) {
+        mi->channel_wrlock();
+        end_info(mi);
+        if (mi->rli) delete mi->rli;
+        delete mi;
+        it->second = 0;
+      }
+    }
+  }
+#endif
 
   channel_map.unlock();
 }
@@ -3992,7 +4084,11 @@ void set_slave_thread_options(THD *thd) {
      only for client threads.
   */
   ulonglong options = thd->variables.option_bits | OPTION_BIG_SELECTS;
-  if (opt_log_replica_updates)
+  if (opt_log_replica_updates
+#ifdef WESQL_CLUSTER
+      && !thd->consensus_context.consensus_replication_applier
+#endif
+  )
     options |= OPTION_BIN_LOG;
   else
     options &= ~OPTION_BIN_LOG;
@@ -4360,6 +4456,11 @@ static int sql_delay_event(Log_event *ev, THD *thd, Relay_log_info *rli) {
       */
       if (type != binary_log::ROTATE_EVENT &&
           type != binary_log::FORMAT_DESCRIPTION_EVENT &&
+#ifdef WESQL_CLUSTER
+          !ev->is_consensus_event() &&
+          (!rli->relay_log.is_consensus_write ||
+           ev->get_type_code() != binary_log::ROTATE_EVENT) &&
+#endif
           type != binary_log::PREVIOUS_GTIDS_LOG_EVENT) {
         // Calculate when we should execute the event.
         sql_delay_end = ev->common_header->when.tv_sec +
@@ -4722,6 +4823,12 @@ apply_event_and_update_pos(Log_event **ptr_ev, THD *thd, Relay_log_info *rli) {
     if (!error && rli->is_mts_recovery() &&
         ev->get_type_code() != binary_log::ROTATE_EVENT &&
         ev->get_type_code() != binary_log::FORMAT_DESCRIPTION_EVENT &&
+#ifdef WESQL_CLUSTER
+        ev->get_type_code() != binary_log::PREVIOUS_CONSENSUS_INDEX_LOG_EVENT &&
+        ev->get_type_code() != binary_log::CONSENSUS_LOG_EVENT &&
+        ev->get_type_code() != binary_log::CONSENSUS_CLUSTER_INFO_EVENT &&
+        ev->get_type_code() != binary_log::CONSENSUS_EMPTY_EVENT &&
+#endif
         ev->get_type_code() != binary_log::PREVIOUS_GTIDS_LOG_EVENT) {
       if (ev->starts_group()) {
         rli->mts_recovery_group_seen_begin = true;
@@ -4961,6 +5068,11 @@ static int exec_relay_log_event(THD *thd, Relay_log_info *rli,
     */
     if ((!rli->is_parallel_exec() || rli->last_master_timestamp == 0) &&
         !(ev->is_artificial_event() || ev->is_relay_log_event() ||
+#ifdef WESQL_CLUSTER
+          ev->is_consensus_event() ||
+          (!rli->relay_log.is_consensus_write &&
+           ev->get_type_code() == binary_log::ROTATE_EVENT) ||
+#endif
           ev->get_type_code() == binary_log::FORMAT_DESCRIPTION_EVENT ||
           ev->server_id == 0)) {
       rli->last_master_timestamp =
@@ -5019,6 +5131,15 @@ static int exec_relay_log_event(THD *thd, Relay_log_info *rli,
         */
         return 1;
     }
+
+#ifdef WESQL_CLUSTER
+    if (RUN_HOOK(binlog_applier, before_apply_event, (rli, ev))) {
+      rli->abort_slave = true;
+      mysql_mutex_unlock(&rli->data_lock);
+      delete ev;
+      return SLAVE_APPLY_EVENT_AND_UPDATE_POS_UPDATE_POS_ERROR;
+    }
+#endif
 
     /* ptr_ev can change to NULL indicating MTS coorinator passed to a Worker */
     exec_res = apply_event_and_update_pos(ptr_ev, thd, rli);
@@ -6023,6 +6144,10 @@ static void *handle_slave_worker(void *arg) {
 
   thd->variables.require_row_format = rli->is_row_format_required();
 
+#ifdef WESQL_CLUSTER
+  if (RUN_HOOK(binlog_applier, before_start, (w, 0))) goto err;
+#endif
+
   if (Relay_log_info::PK_CHECK_STREAM !=
       rli->get_require_table_primary_key_check())
     thd->variables.sql_require_primary_key =
@@ -6103,6 +6228,10 @@ static void *handle_slave_worker(void *arg) {
   assert(rli->mts_pending_jobs_size < rli->mts_pending_jobs_size_max);
 
   mysql_mutex_unlock(&rli->pending_jobs_lock);
+
+#ifdef WESQL_CLUSTER
+  if (RUN_HOOK(binlog_applier, after_stop, (w))) goto err;
+#endif
 
   /*
      In MTS case cleanup_after_session() has be called explicitly.
@@ -6185,6 +6314,16 @@ bool mts_recovery_groups(Relay_log_info *rli) {
   bool flag_group_seen_begin = false;
   uint recovery_group_cnt = 0;
   bool not_reached_commit = true;
+
+#ifdef WESQL_CLUSTER
+  if (!NO_HOOK(binlog_applier)) {
+    bool exit = false;
+    if (RUN_HOOK(binlog_applier, on_mts_recovery_groups, (rli, exit))) {
+      is_error = true;
+    }
+    if (is_error || exit) return is_error;
+  }
+#endif
 
   // Value-initialization, to avoid compiler warnings on push_back.
   Slave_job_group job_worker = Slave_job_group();
@@ -6343,6 +6482,13 @@ bool mts_recovery_groups(Relay_log_info *rli) {
 
         if (ev->get_type_code() == binary_log::ROTATE_EVENT ||
             ev->get_type_code() == binary_log::FORMAT_DESCRIPTION_EVENT ||
+#ifdef WESQL_CLUSTER
+            ev->get_type_code() ==
+                binary_log::PREVIOUS_CONSENSUS_INDEX_LOG_EVENT ||
+            ev->get_type_code() == binary_log::CONSENSUS_LOG_EVENT ||
+            ev->get_type_code() == binary_log::CONSENSUS_CLUSTER_INFO_EVENT ||
+            ev->get_type_code() == binary_log::CONSENSUS_EMPTY_EVENT ||
+#endif
             ev->get_type_code() == binary_log::PREVIOUS_GTIDS_LOG_EVENT) {
           delete ev;
           ev = nullptr;
@@ -6509,6 +6655,10 @@ bool mta_checkpoint_routine(Relay_log_info *rli, bool force) {
 
   if (rli->gaq->lwm.group_relay_log_name[0] != 0)
     rli->set_group_relay_log_name(rli->gaq->lwm.group_relay_log_name);
+
+#ifdef WESQL_CLUSTER
+  (void)RUN_HOOK(binlog_applier, on_checkpoint_routine, (rli));
+#endif
 
   /*
      todo: uncomment notifies when UNTIL will be supported
@@ -7090,6 +7240,18 @@ extern "C" void *handle_slave_sql(void *arg) {
       goto err;
     }
 
+#ifdef WESQL_CLUSTER
+    if (RUN_HOOK(binlog_applier, before_start,
+                 (rli, rli->opt_replica_parallel_workers))) {
+      mysql_cond_broadcast(&rli->start_cond);
+      mysql_mutex_unlock(&rli->run_lock);
+      rli->report(ERROR_LEVEL, ER_REPLICA_FATAL_ERROR,
+                  ER_THD(thd, ER_REPLICA_FATAL_ERROR),
+                  "Failed to run 'start' hook");
+      goto err;
+    }
+#endif
+
     /* MTS: starting the worker pool */
     if (slave_start_workers(rli, rli->opt_replica_parallel_workers,
                             &mts_inited) != 0) {
@@ -7158,6 +7320,15 @@ extern "C" void *handle_slave_sql(void *arg) {
     mysql_mutex_unlock(&rli->log_space_lock);
     rli->trans_retries = 0;  // start from "no error"
     DBUG_PRINT("info", ("rli->trans_retries: %lu", rli->trans_retries));
+
+#ifdef WESQL_CLUSTER
+    if (RUN_HOOK(binlog_applier, reader_before_open, (rli, &applier_reader))) {
+      rli->report(ERROR_LEVEL, ER_REPLICA_FATAL_ERROR,
+                  ER_THD(thd, ER_REPLICA_FATAL_ERROR),
+                  "Failed to run 'open_applier_reader' hook");
+      goto err;
+    }
+#endif
 
     if (applier_reader.open(&errmsg)) {
       rli->report(ERROR_LEVEL, ER_REPLICA_FATAL_ERROR, "%s", errmsg);
@@ -7261,8 +7432,23 @@ extern "C" void *handle_slave_sql(void *arg) {
         saved_skip = 0;
       }
 
+#ifdef WESQL_CLUSTER
+      bool applier_stop = false;
+      (void)RUN_HOOK(binlog_applier, before_read_next_event,
+                     (rli, applier_stop));
+      if (applier_stop) break;
+#endif
+
       // read next event
       mysql_mutex_lock(&rli->data_lock);
+#ifdef WESQL_CLUSTER
+      if (RUN_HOOK(binlog_applier, reader_before_read_event,
+                   (rli, &applier_reader))) {
+        mysql_mutex_unlock(&rli->data_lock);
+        main_loop_error = true;
+        break;
+      }
+#endif
       ev = applier_reader.read_next_event();
       mysql_mutex_unlock(&rli->data_lock);
 
@@ -7345,6 +7531,22 @@ extern "C" void *handle_slave_sql(void *arg) {
     thd->set_catalog(NULL_CSTR);
     thd->reset_query();
     thd->reset_db(NULL_CSTR);
+
+#ifdef WESQL_CLUSTER
+    if (RUN_HOOK(binlog_applier, reader_before_close, (rli, &applier_reader))) {
+      rli->report(ERROR_LEVEL, ER_REPLICA_FATAL_ERROR,
+                  ER_THD(thd, ER_REPLICA_FATAL_ERROR),
+                  "Failed to run 'before_close_reader' hook");
+    }
+#endif
+
+#ifdef WESQL_CLUSTER
+    if (RUN_HOOK(binlog_applier, after_stop, (rli))) {
+      rli->report(ERROR_LEVEL, ER_REPLICA_FATAL_ERROR,
+                  ER_THD(thd, ER_REPLICA_FATAL_ERROR),
+                  "Failed to run 'after_stop' hook");
+    }
+#endif
 
     /*
       Pause the SQL thread and wait for 'continue_to_stop_sql_thread'
@@ -8248,6 +8450,419 @@ end:
 }
 
 /**
+ * @brief Store an event from the object store into the relay log.
+ *
+ * @param mi
+ * @param buf
+ * @param event_len
+ * @param do_flush_mi
+ * @param event_pos Mark that this event with "event_pos=0", so the slave should
+ not increment master's binlog position (mi->master_log_pos)
+ * @return QUEUE_EVENT_RESULT
+ */
+QUEUE_EVENT_RESULT queue_event_from_objstore(Master_info *mi, const char *buf,
+                                             ulong event_len,
+                                             bool do_flush_mi) {
+  QUEUE_EVENT_RESULT res = QUEUE_EVENT_OK;
+  ulong inc_pos = 0;
+  Relay_log_info *rli = mi->rli;
+  mysql_mutex_t *log_lock = rli->relay_log.get_log_lock();
+  ulong s_id;
+  int lock_count = 0;
+
+  enum_binlog_checksum_alg checksum_alg =
+      mi->checksum_alg_before_fd != binary_log::BINLOG_CHECKSUM_ALG_UNDEF
+          ? mi->checksum_alg_before_fd
+          : mi->rli->relay_log.relay_log_checksum_alg;
+
+  const char *save_buf =
+      nullptr;  // needed for checksumming the fake Rotate event
+  char rot_buf[LOG_EVENT_HEADER_LEN + Binary_log_event::ROTATE_HEADER_LEN +
+               FN_REFLEN];
+  Gtid gtid = {0, 0};
+  ulonglong immediate_commit_timestamp = 0;
+  ulonglong original_commit_timestamp = 0;
+  bool info_error{false};
+  binary_log::Log_event_basic_info log_event_info;
+  ulonglong compressed_transaction_bytes = 0;
+  ulonglong uncompressed_transaction_bytes = 0;
+  auto compression_type = binary_log::transaction::compression::type::NONE;
+  Log_event_type event_type = (Log_event_type)buf[EVENT_TYPE_OFFSET];
+
+  assert(checksum_alg == binary_log::BINLOG_CHECKSUM_ALG_OFF ||
+         checksum_alg == binary_log::BINLOG_CHECKSUM_ALG_UNDEF ||
+         checksum_alg == binary_log::BINLOG_CHECKSUM_ALG_CRC32);
+
+  DBUG_TRACE;
+
+  /*
+    Pause the binlog archive replica relay thread execution and wait for
+    'continue_queuing_event' signal to continue IO thread execution.
+  */
+  DBUG_SIGNAL_WAIT_FOR(current_thd, "pause_on_queuing_event_from_objstore",
+                       "reached_pause_on_queue_event_from_objstore",
+                       "continue_queuing_event_from_objstore");
+
+  if (event_type == binary_log::FORMAT_DESCRIPTION_EVENT) {
+    checksum_alg = Log_event_footer::get_checksum_alg(buf, event_len);
+  }
+
+  assert(mi->rli->relay_log.relay_log_checksum_alg !=
+         binary_log::BINLOG_CHECKSUM_ALG_UNDEF);
+
+  binary_log_debug::debug_checksum_test =
+      DBUG_EVALUATE_IF("simulate_checksum_test_failure", true, false);
+  if (Log_event_footer::event_checksum_test(
+          const_cast<uchar *>(pointer_cast<const uchar *>(buf)), event_len,
+          checksum_alg)) {
+    mi->report(ERROR_LEVEL, ER_NETWORK_READ_EVENT_CHECKSUM_FAILURE, "%s",
+               ER_THD(current_thd, ER_NETWORK_READ_EVENT_CHECKSUM_FAILURE));
+    goto err;
+  }
+
+  /*
+    From now, and up to finishing queuing the event, no other thread is allowed
+    to write to the relay log, or to rotate it.
+  */
+  mysql_mutex_lock(log_lock);
+  assert(lock_count == 0);
+  lock_count = 1;
+
+  if (mi->get_mi_description_event() == nullptr) {
+    LogErr(ERROR_LEVEL, ER_RPL_REPLICA_QUEUE_EVENT_FAILED_INVALID_CONFIGURATION,
+           mi->get_channel());
+    goto err;
+  }
+
+  std::tie(info_error, log_event_info) = extract_log_event_basic_info(
+      buf, event_len, mi->get_mi_description_event());
+  if (info_error || mi->transaction_parser.feed_event(log_event_info, true)) {
+    LogErr(WARNING_LEVEL,
+           ER_RPL_REPLICA_IO_THREAD_DETECTED_UNEXPECTED_EVENT_SEQUENCE,
+           mi->get_master_log_name(), mi->get_master_log_pos());
+  }
+
+  switch (event_type) {
+    case binary_log::STOP_EVENT:
+      do_flush_mi = false;
+      goto end;
+    case binary_log::ROTATE_EVENT: {
+      Format_description_log_event *fde = mi->get_mi_description_event();
+      enum_binlog_checksum_alg fde_checksum_alg = fde->footer()->checksum_alg;
+      if (fde_checksum_alg != checksum_alg)
+        fde->footer()->checksum_alg = checksum_alg;
+      Rotate_log_event rev(buf, fde);
+      fde->footer()->checksum_alg = fde_checksum_alg;
+
+      if (unlikely(process_io_rotate(mi, &rev))) {
+        // This error will be reported later at handle_slave_io().
+        goto err;
+      }
+      /*
+         Checksum special cases for the fake Rotate (R_f) event caused by the
+         protocol of events generation and serialization in RL where Rotate of
+         master is queued right next to FD of slave. Since it's only FD that
+         carries the alg desc of FD_s has to apply to R_m. Two special rules
+         apply only to the first R_f which comes in before any FD_m. The 2nd R_f
+         should be compatible with the FD_s that must have taken over the last
+         seen FD_m's (A).
+
+         RSC_1: If OM \and fake Rotate \and slave is configured to
+                to compute checksum for its first FD event for RL
+                the fake Rotate gets checksummed here.
+      */
+      if (uint4korr(&buf[0]) == 0 &&
+          checksum_alg == binary_log::BINLOG_CHECKSUM_ALG_OFF &&
+          mi->rli->relay_log.relay_log_checksum_alg !=
+              binary_log::BINLOG_CHECKSUM_ALG_OFF) {
+        ha_checksum rot_crc = checksum_crc32(0L, nullptr, 0);
+        event_len += BINLOG_CHECKSUM_LEN;
+        memcpy(rot_buf, buf, event_len - BINLOG_CHECKSUM_LEN);
+        int4store(&rot_buf[EVENT_LEN_OFFSET],
+                  uint4korr(rot_buf + EVENT_LEN_OFFSET) + BINLOG_CHECKSUM_LEN);
+        rot_crc = checksum_crc32(rot_crc, (const uchar *)rot_buf,
+                                 event_len - BINLOG_CHECKSUM_LEN);
+        int4store(&rot_buf[event_len - BINLOG_CHECKSUM_LEN], rot_crc);
+        assert(event_len == uint4korr(&rot_buf[EVENT_LEN_OFFSET]));
+        assert(mi->get_mi_description_event()->common_footer->checksum_alg ==
+               mi->rli->relay_log.relay_log_checksum_alg);
+        /* the first one */
+        assert(mi->checksum_alg_before_fd !=
+               binary_log::BINLOG_CHECKSUM_ALG_UNDEF);
+        save_buf = buf;
+        buf = rot_buf;
+      } else
+          /*
+            RSC_2: If NM \and fake Rotate \and slave does not compute checksum
+            the fake Rotate's checksum is stripped off before relay-logging.
+          */
+          if (uint4korr(&buf[0]) == 0 &&
+              checksum_alg != binary_log::BINLOG_CHECKSUM_ALG_OFF &&
+              mi->rli->relay_log.relay_log_checksum_alg ==
+                  binary_log::BINLOG_CHECKSUM_ALG_OFF) {
+        event_len -= BINLOG_CHECKSUM_LEN;
+        memcpy(rot_buf, buf, event_len);
+        int4store(&rot_buf[EVENT_LEN_OFFSET],
+                  uint4korr(rot_buf + EVENT_LEN_OFFSET) - BINLOG_CHECKSUM_LEN);
+        assert(event_len == uint4korr(&rot_buf[EVENT_LEN_OFFSET]));
+        assert(mi->get_mi_description_event()->common_footer->checksum_alg ==
+               mi->rli->relay_log.relay_log_checksum_alg);
+        /* the first one */
+        assert(mi->checksum_alg_before_fd !=
+               binary_log::BINLOG_CHECKSUM_ALG_UNDEF);
+        save_buf = buf;
+        buf = rot_buf;
+      }
+      inc_pos = 0;
+      break;
+    }
+    case binary_log::FORMAT_DESCRIPTION_EVENT: {
+      /*
+        Create an event, and save it (when we rotate the relay log, we will have
+        to write this event again).
+      */
+      mi->checksum_alg_before_fd = binary_log::BINLOG_CHECKSUM_ALG_UNDEF;
+      Format_description_log_event *new_fdle;
+      Log_event *ev = nullptr;
+      if (binlog_event_deserialize(reinterpret_cast<const unsigned char *>(buf),
+                                   event_len, mi->get_mi_description_event(),
+                                   true, &ev) != Binlog_read_error::SUCCESS) {
+        // This error will be reported later at handle_slave_io().
+        goto err;
+      }
+
+      new_fdle = dynamic_cast<Format_description_log_event *>(ev);
+      if (new_fdle->common_footer->checksum_alg ==
+          binary_log::BINLOG_CHECKSUM_ALG_UNDEF)
+        new_fdle->common_footer->checksum_alg =
+            binary_log::BINLOG_CHECKSUM_ALG_OFF;
+
+      mi->set_mi_description_event(new_fdle);
+
+      /* installing new value of checksum Alg for relay log */
+      mi->rli->relay_log.relay_log_checksum_alg =
+          new_fdle->common_footer->checksum_alg;
+
+      /*
+         Though this does some conversion to the slave's format, this will
+         preserve the master's binlog format version, and number of event types.
+      */
+      /*
+         If the event was not requested by the slave (the slave did not ask for
+         it), i.e. has end_log_pos=0, we do not increment
+         mi->get_master_log_pos()
+      */
+           /*
+         If the event was not requested by the slave (the slave did not ask for
+         it), i.e. has end_log_pos=0, we do not increment
+         mi->get_master_log_pos()
+      */
+      inc_pos = uint4korr(buf + LOG_POS_OFFSET) ? event_len : 0;
+    } break;
+
+    case binary_log::HEARTBEAT_LOG_EVENT: 
+    case binary_log::HEARTBEAT_LOG_EVENT_V2: {
+      assert(false);
+    } break;
+    case binary_log::PREVIOUS_GTIDS_LOG_EVENT: {
+      /*
+        This event does not have any meaning for the slave and
+        was just sent to show the slave the master is making
+        progress and avoid possible deadlocks.
+        So at this point, the event is replaced by a rotate
+        event what will make the slave to update what it knows
+        about the master's coordinates.
+      */
+      inc_pos = 0;
+      mysql_mutex_lock(&mi->data_lock);
+      mi->set_master_log_pos(mi->get_master_log_pos() + event_len);
+      mysql_mutex_unlock(&mi->data_lock);
+
+      if (write_rotate_to_master_pos_into_relay_log(
+              mi->info_thd, mi, true /* force_flush_mi_info */))
+        goto err;
+
+      do_flush_mi = false; /* write_rotate_... above flushed master info */
+      goto end;
+    } break;
+
+    case binary_log::TRANSACTION_PAYLOAD_EVENT: {
+      binary_log::Transaction_payload_event tpe(buf,
+                                                mi->get_mi_description_event());
+      compression_type = tpe.get_compression_type();
+      compressed_transaction_bytes = tpe.get_payload_size();
+      uncompressed_transaction_bytes = tpe.get_uncompressed_size();
+      auto gtid_monitoring_info = mi->get_gtid_monitoring_info();
+      gtid_monitoring_info->update(compression_type,
+                                   compressed_transaction_bytes,
+                                   uncompressed_transaction_bytes);
+      inc_pos = event_len;
+      break;
+    }
+
+    case binary_log::GTID_LOG_EVENT: {
+      /*
+        This can happen if the master uses GTID_MODE=OFF_PERMISSIVE, and
+        sends GTID events to the slave. A possible scenario is that user
+        does not follow the upgrade procedure for GTIDs, and creates a
+        topology like A->B->C, where A uses GTID_MODE=ON_PERMISSIVE, B
+        uses GTID_MODE=OFF_PERMISSIVE, and C uses GTID_MODE=OFF.  Each
+        connection is allowed, but the master A will generate GTID
+        transactions which will be sent through B to C.  Then C will hit
+        this error.
+      */
+      if (global_gtid_mode.get() == Gtid_mode::OFF) {
+        mi->report(
+            ERROR_LEVEL, ER_CANT_REPLICATE_GTID_WITH_GTID_MODE_OFF,
+            ER_THD(current_thd, ER_CANT_REPLICATE_GTID_WITH_GTID_MODE_OFF),
+            mi->get_master_log_name(), mi->get_master_log_pos());
+        goto err;
+      }
+      Gtid_log_event gtid_ev(buf, mi->get_mi_description_event());
+      if (!gtid_ev.is_valid()) goto err;
+      rli->get_sid_lock()->rdlock();
+      gtid.sidno = gtid_ev.get_sidno(rli->get_gtid_set()->get_sid_map());
+      rli->get_sid_lock()->unlock();
+      if (gtid.sidno < 0) goto err;
+      gtid.gno = gtid_ev.get_gno();
+      original_commit_timestamp = gtid_ev.original_commit_timestamp;
+      immediate_commit_timestamp = gtid_ev.immediate_commit_timestamp;
+      compressed_transaction_bytes = uncompressed_transaction_bytes =
+          gtid_ev.transaction_length - gtid_ev.get_event_length();
+
+      inc_pos = event_len;
+    } break;
+
+    case binary_log::ANONYMOUS_GTID_LOG_EVENT: {
+      if (mi->rli->m_assign_gtids_to_anonymous_transactions_info
+                   .get_type() == Assign_gtids_to_anonymous_transactions_info::
+                                      enum_type::AGAT_OFF) {
+        if (global_gtid_mode.get() == Gtid_mode::ON) {
+          mi->report(ERROR_LEVEL, ER_CANT_REPLICATE_ANONYMOUS_WITH_GTID_MODE_ON,
+                     ER_THD(current_thd,
+                            ER_CANT_REPLICATE_ANONYMOUS_WITH_GTID_MODE_ON),
+                     mi->get_master_log_name(), mi->get_master_log_pos());
+          goto err;
+        }
+      }
+      /*
+       save the original_commit_timestamp and the immediate_commit_timestamp to
+       be later used for monitoring
+      */
+      Gtid_log_event anon_gtid_ev(buf, mi->get_mi_description_event());
+      original_commit_timestamp = anon_gtid_ev.original_commit_timestamp;
+      immediate_commit_timestamp = anon_gtid_ev.immediate_commit_timestamp;
+      compressed_transaction_bytes = uncompressed_transaction_bytes =
+          anon_gtid_ev.transaction_length - anon_gtid_ev.get_event_length();
+    }
+      [[fallthrough]];
+    default:
+      inc_pos = event_len;
+      break;
+  }
+  s_id = uint4korr(buf + SERVER_ID_OFFSET);
+
+  /*
+    If server_id_bits option is set we need to mask out irrelevant bits
+    when checking server_id, but we still put the full unmasked server_id
+    into the Relay log so that it can be accessed when applying the event
+  */
+  s_id &= opt_server_id_mask;
+
+  if ((s_id == ::server_id && !mi->rli->replicate_same_server_id) ||
+      (mi->ignore_server_ids->dynamic_ids.size() > 0 &&
+       mi->shall_ignore_server_id(s_id) &&
+       /* everything is filtered out from non-master */
+       (s_id != mi->master_id ||
+        /* for the master meta information is necessary */
+        (event_type != binary_log::FORMAT_DESCRIPTION_EVENT &&
+         event_type != binary_log::ROTATE_EVENT)))) {
+    if (!(s_id == ::server_id && !mi->rli->replicate_same_server_id) ||
+        (event_type != binary_log::FORMAT_DESCRIPTION_EVENT &&
+         event_type != binary_log::ROTATE_EVENT &&
+         event_type != binary_log::STOP_EVENT)) {
+      rli->relay_log.lock_binlog_end_pos();
+      mi->set_master_log_pos(mi->get_master_log_pos() + inc_pos);
+      memcpy(rli->ign_master_log_name_end, mi->get_master_log_name(),
+             FN_REFLEN);
+      assert(rli->ign_master_log_name_end[0]);
+      rli->ign_master_log_pos_end = mi->get_master_log_pos();
+      // the slave SQL thread needs to re-check
+      rli->relay_log.update_binlog_end_pos(false /*need_lock*/);
+      rli->relay_log.unlock_binlog_end_pos();
+    }
+    DBUG_PRINT(
+        "info",
+        ("source_log_pos: %lu, event originating from %u server, ignored",
+         (ulong)mi->get_master_log_pos(), uint4korr(buf + SERVER_ID_OFFSET)));
+  } else {
+    bool is_error = false;
+    /* write the event to the relay log */
+    if (likely(rli->relay_log.write_buffer(buf, event_len, mi) == 0)) {
+      DBUG_SIGNAL_WAIT_FOR(
+          current_thd, "pause_on_queue_event_from_objstore_after_write_buffer",
+          "receiver_reached_pause_on_queue_event_from_objstore",
+          "receiver_continue_queuing_event_from_objstore");
+      mysql_mutex_lock(&mi->data_lock);
+      lock_count = 2;
+      mi->set_master_log_pos(mi->get_master_log_pos() + inc_pos);
+      DBUG_PRINT("info",
+                 ("source_log_pos: %lu", (ulong)mi->get_master_log_pos()));
+      if (event_type == binary_log::GTID_LOG_EVENT ||
+          event_type == binary_log::ANONYMOUS_GTID_LOG_EVENT) {
+        // set the timestamp for the start time of queueing this transaction
+        mi->started_queueing(gtid, original_commit_timestamp,
+                             immediate_commit_timestamp);
+
+        auto gtid_monitoring_info = mi->get_gtid_monitoring_info();
+        gtid_monitoring_info->update(
+            binary_log::transaction::compression::type::NONE,
+            compressed_transaction_bytes, uncompressed_transaction_bytes);
+      }
+    } else {
+      mi->transaction_parser.rollback();
+      is_error = true;
+    }
+
+    if (save_buf != nullptr) buf = save_buf;
+    if (is_error) {
+      // This error will be reported later at handle_slave_io().
+      goto err;
+    }
+  }
+  goto end;
+
+err:
+  res = QUEUE_EVENT_ERROR_QUEUING;
+
+end:
+  if (res == QUEUE_EVENT_OK && do_flush_mi) {
+    /*
+      Take a ride in the already locked LOCK_log to flush master info.
+
+      JAG: TODO: Notice that we could only flush master info if we are
+                 not in the middle of a transaction. Having a proper
+                 relay log recovery can allow us to do this.
+    */
+    if (lock_count == 1) {
+      mysql_mutex_lock(&mi->data_lock);
+      lock_count = 2;
+    }
+
+    if (flush_master_info(mi, false /*force*/, lock_count == 0 /*need_lock*/,
+                          false /*flush_relay_log*/, mi->is_gtid_only_mode()))
+      res = QUEUE_EVENT_ERROR_FLUSHING_INFO;
+    if (mi->is_gtid_only_mode()) {
+      mi->update_flushed_relay_log_info();
+    }
+  }
+  if (lock_count >= 2) mysql_mutex_unlock(&mi->data_lock);
+  if (lock_count >= 1) mysql_mutex_unlock(log_lock);
+  DBUG_PRINT("info", ("queue result: %d", res));
+  return res;
+}
+
+/**
   Hook to detach the active VIO before closing a connection handle.
 
   The client API might close the connection (and associated data)
@@ -8638,6 +9253,14 @@ int flush_relay_logs(Master_info *mi, THD *thd) {
   if (mi) {
     Relay_log_info *rli = mi->rli;
     if (rli->inited) {
+#ifdef WESQL_CLUSTER
+      if (is_consensus_replication_enabled() &&
+          channel_map.is_consensus_replication_channel_name(
+              mi->get_channel())) {
+        return 0;
+      }
+#endif
+
       // Rotate immediately if one is true:
       if ((!is_group_replication_plugin_loaded() ||  // GR is disabled
            !mi->transaction_parser
@@ -9330,6 +9953,16 @@ bool reset_slave_cmd(THD *thd) {
       channel_map.unlock();
       return true;
     }
+
+#ifdef WESQL_CLUSTER
+    if (mi && is_consensus_replication_enabled() &&
+        channel_map.is_consensus_replication_channel_name(mi->get_channel())) {
+      my_error(ER_REPLICA_CHANNEL_OPERATION_NOT_ALLOWED, MYF(0),
+               "RESET SLAVE [ALL] FOR CHANNEL", mi->get_channel());
+      channel_map.unlock();
+      return true;
+    }
+#endif
 
     if (mi)
       res = reset_slave(thd, mi, thd->lex->reset_slave_info.all);
@@ -10996,6 +11629,14 @@ bool change_master_cmd(THD *thd) {
     res = true;
     goto err;
   }
+
+#ifdef WESQL_CLUSTER
+  if (channel_map.is_consensus_replication_channel_name(lex->mi.channel)) {
+    my_error(ER_REPLICA_CHANNEL_NAME_INVALID_OR_TOO_LONG, MYF(0));
+    res = true;
+    goto err;
+  }
+#endif
 
   if (channel_map.is_group_replication_channel_name(lex->mi.channel, true)) {
     /*

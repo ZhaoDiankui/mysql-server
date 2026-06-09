@@ -1021,9 +1021,6 @@ SET(BINLOG_SOURCE
   binlog/monitoring/context.cc
   binlog/decompressing_event_object_istream.cc
   binlog.cc
-  binlog_archive.cc
-  binlog_archive_replica.cc
-  binlog_archive_command.cc
   binlog_istream.cc
   binlog_ostream.cc
   binlog_reader.cc
@@ -1032,10 +1029,6 @@ SET(BINLOG_SOURCE
   changestreams/misc/column_filters/column_filter_inbound_func_indexes.cc
   changestreams/misc/column_filters/column_filter_inbound_gipk.cc
   changestreams/misc/column_filters/column_filter_outbound_func_indexes.cc
-  consistent_archive.cc
-  consistent_recovery.cc
-  consistent_snapshot_purge_command.cc
-  consistent_snapshot_force_command.cc
   log_event.cc
   rpl_commit_stage_manager.cc
   rpl_filter.cc

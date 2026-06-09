@@ -827,8 +827,6 @@ INCLUDE(CMakePushCheckState)
 
 # Add macros
 INCLUDE(add_custom_target)
-INCLUDE(aws_sdk_cpp)
-INCLUDE(aliyun_oss_sdk)
 INCLUDE(pkg-config)
 INCLUDE(character_sets)
 INCLUDE(cmake_parse_arguments)
@@ -1770,12 +1768,6 @@ IF(WITH_SYSTEM_LIBS)
   UNSET(WITH_SYSTEM_LIBS CACHE)
 ENDIF()
 
-# Add bundled or system objstore lib, here is aws-sdk-cpp.
-MYSQL_CHECK_OBJSTORE_S3()
-
-# Add aliyun-oss-cpp-sdk, see https://github.com/aliyun/aliyun-oss-cpp-sdk
-MYSQL_CHECK_OBJSTORE_ALIYUN_OSS()
-
 # Add bundled or system zlib.
 MYSQL_CHECK_ZLIB()
 
@@ -2085,22 +2077,6 @@ IF(WITH_PROTOBUF STREQUAL "bundled" OR WITH_FIDO STREQUAL "bundled")
 ENDIF()
 
 
-#Compile the smartengine storage plugin into mysqld.
-OPTION(WITH_SMARTENGINE "Compile smartengine" ON)
-IF (WITH_SMARTENGINE)
-  ADD_DEFINITIONS(-DWITH_SMARTENGINE)
-ENDIF()
-
-OPTION(WITH_QUERY_TRACE "WITH_QUERY_TRACE" ON)
-if (WITH_QUERY_TRACE)
-  add_definitions(-DWITH_QUERY_TRACE)
-endif()
-
-#Ensure compatibility with the usage patterns of xengine
-OPTION(WITH_XENGINE_COMPATIBLE_MODE "Compatible with xengine" OFF)
-IF (WITH_XENGINE_COMPATIBLE_MODE)
-  ADD_DEFINITIONS(-DWITH_XENGINE_COMPATIBLE_MODE)
-ENDIF()
 
 #
 # Setup maintainer mode options by the end. Platform checks are
@@ -2516,7 +2492,7 @@ ENDIF()
 #
 IF(NOT INSTALL_LAYOUT MATCHES "RPM")
   INSTALL(FILES
-    README.md
+    README
     LICENSE
     DESTINATION ${INSTALL_DOCREADMEDIR} COMPONENT Readme)
   INSTALL(FILES

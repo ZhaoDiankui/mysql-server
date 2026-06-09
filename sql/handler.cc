@@ -7976,22 +7976,7 @@ int handler::ha_reset() {
   return retval;
 }
 
-#ifdef WITH_SMARTENGINE
-bool operating_on_smartengine_during_xa(THD *thd, handlerton *hton) {
-  if (hton->db_type == DB_TYPE_SMARTENGINE) {
-    const bool PRINT_ERROR_WHEN_CHECK_IN_XA = false;
-    const bool is_in_xa = (thd->get_transaction()->xid_state()->check_in_xa(
-          PRINT_ERROR_WHEN_CHECK_IN_XA));
-    if (is_in_xa) {
-      my_error(HA_ERR_WRONG_COMMAND, MYF(0),
-          "SMARTENGINE not support XA transactions");
-    }
-    return is_in_xa;
-  } else {
-    return false;
-  }
-}
-#endif
+
 
 int handler::ha_write_row(uchar *buf) {
   int error;
@@ -8002,13 +7987,6 @@ int handler::ha_write_row(uchar *buf) {
   DBUG_EXECUTE_IF("inject_error_ha_write_row", return HA_ERR_INTERNAL_ERROR;);
   DBUG_EXECUTE_IF("simulate_storage_engine_out_of_memory",
                   return HA_ERR_SE_OUT_OF_MEMORY;);
-
-#ifdef WITH_SMARTENGINE
-  if (operating_on_smartengine_during_xa(ha_thd(), ht)) {
-    /**smartengine currently not support executing xa dml. */
-    return HA_ERR_UNSUPPORTED;
-  }
-#endif
 
   mark_trx_read_write();
 
@@ -8795,21 +8773,6 @@ void ha_post_recover(void) {
                        MYSQL_STORAGE_ENGINE_PLUGIN, nullptr);
 }
 
-#ifdef WITH_SMARTENGINE
-static bool post_engine_recover_handlerton(THD *, plugin_ref plugin, void *) {
-  handlerton *hton = plugin_data<handlerton *>(plugin);
-
-  if (hton->state == SHOW_OPTION_YES && hton->post_engine_recover)
-    hton->post_engine_recover();
-
-  return false;
-}
-
-void ha_post_engine_recover(void) {
-  (void)plugin_foreach(nullptr, post_engine_recover_handlerton,
-                       MYSQL_STORAGE_ENGINE_PLUGIN, nullptr);
-}
-#endif
 
 void handler::ha_set_primary_handler(handler *primary_handler) {
   assert((ht->flags & HTON_IS_SECONDARY_ENGINE) != 0);

@@ -40,7 +40,6 @@
 #include "my_thread.h"
 #include "sql/check_stack.h"
 #include "sql/clone_handler.h"
-#include "sql/consistent_recovery.h"
 #include "sql/raii/thread_stage_guard.h"
 #include "sql_string.h"
 #include "template_utils.h"
@@ -86,7 +85,6 @@
 #include "partition_info.h"
 #include "prealloced_array.h"
 #include "scope_guard.h"
-#include "sql/binlog_archive.h"
 #include "sql/binlog/decompressing_event_object_istream.h"
 #include "sql/binlog/global.h"
 #include "sql/binlog/group_commit/bgc_ticket_manager.h"  // Bgc_ticket_manager
@@ -6028,32 +6026,6 @@ int MYSQL_BIN_LOG::purge_logs(const char *to_log, bool included,
     goto err;
   }
 
-  if (opt_serverless && opt_binlog_archive) {
-    Binlog_archive *binlog_archive = Binlog_archive::get_instance();
-    mysql_mutex_t *binlog_archive_lock =
-        binlog_archive->get_binlog_archive_lock();
-    mysql_mutex_lock(binlog_archive_lock);
-    if (!binlog_archive->is_thread_running()) {
-      mysql_mutex_unlock(binlog_archive_lock);
-      if (!auto_purge)
-        push_warning_printf(
-            thd, Sql_condition::SL_WARNING,
-            ER_WARN_PURGE_LOG_IN_BINLOG_ARCHIVE_NOT_RUNNING,
-            ER_THD(thd, ER_WARN_PURGE_LOG_IN_BINLOG_ARCHIVE_NOT_RUNNING),
-            to_log);
-      goto err;
-    }
-    mysql_mutex_unlock(binlog_archive_lock);
-    binlog_archive->get_mysql_current_archive_binlog(&last_persisted_log_info,
-                                                     true);
-    if (last_persisted_log_info.log_file_name[0] == '\0') {
-      if (!auto_purge)
-        push_warning_printf(
-            thd, Sql_condition::SL_WARNING, ER_WARN_PURGE_LOG_NOT_PERSISTED,
-            ER_THD(thd, ER_WARN_PURGE_LOG_NOT_PERSISTED), to_log);
-      goto err;
-    }
-  }
   /*
     File name exists in index file; delete until we find this file
     or a file that is used.
@@ -6063,18 +6035,6 @@ int MYSQL_BIN_LOG::purge_logs(const char *to_log, bool included,
 
   while ((compare_log_name(to_log, log_info.log_file_name) ||
           (exit_loop = included))) {
-    if (opt_serverless && opt_binlog_archive) {
-      // If binlog_archive is enabled, check if log file is persisted by
-      // binlog_archive thread before purging it.
-      if (compare_log_name(last_persisted_log_info.log_file_name,
-                           log_info.log_file_name) <= 0) {
-        if (!auto_purge)
-          push_warning_printf(
-              thd, Sql_condition::SL_WARNING, ER_WARN_PURGE_LOG_NOT_PERSISTED,
-              ER_THD(thd, ER_WARN_PURGE_LOG_NOT_PERSISTED), to_log);
-        break;
-      }
-    }
     if (is_active(log_info.log_file_name)) {
       if (!auto_purge)
         push_warning_printf(
@@ -6989,6 +6949,7 @@ bool MYSQL_BIN_LOG::truncate_update_log_file(const char *log_name,
   return true;
 }
 
+#ifdef WESQL_CLUSTER
 bool update_log_file_set_flag_in_use(const char *log_name, bool in_use) {
   std::unique_ptr<MYSQL_BIN_LOG::Binlog_ofile> ofile(
       MYSQL_BIN_LOG::Binlog_ofile::open_existing(key_file_binlog, log_name, MYF(MY_WME)));
@@ -7006,6 +6967,7 @@ bool update_log_file_set_flag_in_use(const char *log_name, bool in_use) {
 
   return true;
 }
+#endif
 
 bool MYSQL_BIN_LOG::write_event(Log_event *ev, Master_info *mi) {
   DBUG_TRACE;

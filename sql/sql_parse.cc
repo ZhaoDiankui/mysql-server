@@ -187,10 +187,6 @@
 #include "plugin/raft_replication/consensus_log_manager.h"
 #endif
 
-#ifdef WITH_SMARTENGINE
-#include "storage/smartengine/core/monitoring/query_perf_context.h"
-#endif
-
 namespace resourcegroups {
 class Resource_group;
 }  // namespace resourcegroups
@@ -1727,11 +1723,6 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
   DBUG_TRACE;
   DBUG_PRINT("info", ("command: %d", command));
 
-#ifdef WITH_SMARTENGINE
-  QUERY_TRACE_RESET();
-  QUERY_TRACE_BEGIN(smartengine::monitor::TracePoint::SERVER_OPERATION);
-#endif
-
   Sql_cmd_clone *clone_cmd = nullptr;
 
   /* SHOW PROFILE instrumentation, begin */
@@ -2121,13 +2112,6 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
         size_t length =
             static_cast<size_t>(packet_end - beginning_of_next_stmt);
 
-#ifdef WITH_SMARTENGINE
-        QUERY_TRACE_END(); // end SERVER_OPERATION trace
-        if (thd) {
-          QUERY_TRACE_FINISH(thd->query().str, thd->query().length);
-        }
-#endif
-
         log_slow_statement(thd);
 
         thd->reset_copy_status_var();
@@ -2153,11 +2137,6 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
 #if defined(ENABLED_PROFILING)
         thd->profiling->start_new_query("continuing");
         thd->profiling->set_query_source(beginning_of_next_stmt, length);
-#endif
-
-#ifdef WITH_SMARTENGINE
-        QUERY_TRACE_RESET();
-        QUERY_TRACE_BEGIN(smartengine::monitor::TracePoint::SERVER_OPERATION);
 #endif
 
         mysql_thread_set_secondary_engine(false);
@@ -2500,12 +2479,6 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
   }
 
 done:
-#ifdef WITH_SMARTENGINE
-  QUERY_TRACE_END(); // end SERVER_OPERATION trace
-  if (thd) {
-    QUERY_TRACE_FINISH(thd->query().str, thd->query().length);
-  }
-#endif
 
   assert(thd->open_tables == nullptr ||
          (thd->locked_tables_mode == LTM_LOCK_TABLES));

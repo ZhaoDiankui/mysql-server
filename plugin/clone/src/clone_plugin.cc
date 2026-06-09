@@ -26,15 +26,8 @@ Clone Plugin: Plugin interface
 
 */
 
-#ifdef MYSQL_DYNAMIC_PLUGIN
-#undef MYSQL_DYNAMIC_PLUGIN
 #include <mysql/plugin.h>
 #include <mysql/plugin_clone.h>
-#define MYSQL_DYNAMIC_PLUGIN 
-#else
-#include <mysql/plugin.h>
-#include <mysql/plugin_clone.h>
-#endif 
 
 #include "plugin/clone/include/clone_client.h"
 #include "plugin/clone/include/clone_local.h"
@@ -654,7 +647,7 @@ static SYS_VAR *clone_system_variables[] = {
     nullptr};
 
 /** Declare clone plugin */
-mysql_declare_plugin(clone){
+mysql_declare_plugin(clone_plugin){
     MYSQL_CLONE_PLUGIN,
 
     &clone_descriptor,

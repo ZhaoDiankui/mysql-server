@@ -776,16 +776,12 @@ MySQL clients support the protocol:
 #include "sql/auth/sql_security_ctx.h"
 #include "sql/auto_thd.h"        // Auto_THD
 #include "sql/binlog.h"          // mysql_bin_log
-#include "sql/binlog_archive.h"  // start_binlog_archive
-#include "sql/binlog_archive_replica.h" // start_binlog_archive_replica
 #include "sql/bootstrap.h"       // bootstrap
 #include "sql/check_stack.h"
 #include "sql/conn_handler/connection_acceptor.h"  // Connection_acceptor
 #include "sql/conn_handler/connection_handler_impl.h"  // Per_thread_connection_handler
 #include "sql/conn_handler/connection_handler_manager.h"  // Connection_handler_manager
 #include "sql/conn_handler/socket_connection.h"  // stmt_info_new_packet
-#include "sql/consistent_archive.h"              // start_consistent_archive
-#include "sql/consistent_recovery.h"
 #include "sql/current_thd.h"  // current_thd
 #include "sql/dd/cache/dictionary_client.h"
 #include "sql/debug_sync.h"  // debug_sync_end
@@ -1510,69 +1506,6 @@ char *opt_protocol_compression_algorithms;
 char server_version[SERVER_VERSION_LENGTH];
 const char *mysqld_unix_port;
 char *opt_mysql_tmpdir;
-
-bool consistent_recovery_consensus_recovery = false;
-uint64_t consistent_recovery_snapshot_end_binlog_position = 0;
-uint64_t consistent_recovery_snasphot_end_consensus_index = 0;
-char consistent_recovery_apply_stop_timestamp[MAX_DATETIME_FULL_WIDTH +
-                                        4];  // YYYY-MM-DDTHH:MM:SS.######Z
-// The last truncated MySQL binlog file returned by consensus. The final binlog
-// may contain incomplete transactions that need to be truncated, but with the
-// current binlog archive design, incomplete transactions should not occur.
-char consistent_recovery_consensus_truncated_end_binlog[FN_REFLEN + 1];
-// The truncated position of last truncated MySQL binlog file returned by consensus.
-my_off_t consistent_recovery_consensus_truncated_end_position = 0;
-ulong opt_binlog_archive_slice_max_size = 0;
-bool opt_binlog_archive = true;
-char *opt_binlog_archive_dir = nullptr;
-bool opt_binlog_archive_using_consensus_index = false;
-bool opt_binlog_archive_expire_auto_purge = true;
-ulong opt_binlog_archive_expire_seconds = 0;
-ulonglong opt_binlog_archive_period = 0;
-ulong opt_binlog_archive_parallel_workers = 0;
-bool opt_binlog_archive_replica = false;
-ulong opt_binlog_archive_replica_flush_period = 0;
-char *opt_binlog_archive_replica_source_log_file = nullptr;
-ulong opt_binlog_archive_replica_source_log_pos = 0;
-char *opt_consistent_snapshot_archive_dir = nullptr;
-bool opt_consistent_snapshot_persistent_on_objstore = false;
-bool opt_initialize_use_objstore = false;
-bool opt_consistent_snapshot_archive = true;
-ulong opt_consistent_snapshot_archive_period = 10;
-bool opt_consistent_snapshot_expire_auto_purge = true;
-ulong opt_consistent_snapshot_expire_seconds = 0;
-ulong opt_consistent_snapshot_innodb_tar_mode = 0;
-ulong opt_consistent_snapshot_se_tar_mode = 0;
-bool opt_consistent_snapshot_smartengine_backup_checkpoint=false;
-bool opt_recovery_from_objstore = false;
-char *opt_recovery_consistent_snapshot_tmpdir = nullptr;
-bool opt_recovery_consistent_snapshot_only = false;
-char *opt_recovery_consistent_snapshot_timestamp = nullptr;
-bool opt_initialize_from_source_objectstore = false;
-char *opt_source_objectstore_provider = nullptr;
-char *opt_source_objectstore_region = nullptr;
-char *opt_source_objectstore_endpoint = nullptr;
-bool opt_source_objectstore_use_https = false;
-char *opt_source_objectstore_bucket = nullptr;
-char *opt_source_objectstore_repo_id = nullptr;
-char *opt_source_objectstore_branch_id = nullptr;
-bool opt_source_objectstore_smartengine_data = false;
-bool opt_serverless = true;
-/**
-  TODO(cnut): how to validate the relationship between different variables of
-  object store, such as if opt_table_on_objstore is true, opt_objstore_provider/
-  opt_objstore_region/opt_objstore_bucket can not be empty.
-*/
-bool opt_table_on_objstore = false;
-uint opt_objstore_lease_lock_timeout;
-char *opt_objstore_provider;
-char *opt_objstore_region;
-char *opt_objstore_endpoint;
-bool opt_objstore_use_https = false;
-char *opt_objstore_bucket;
-char *opt_repo_objstore_id = nullptr;
-char *opt_branch_objstore_id = nullptr;
-char *opt_server_id_on_objstore = nullptr;
 
 char *opt_authentication_policy;
 std::vector<std::string> authentication_policy_list;
@@ -2436,12 +2369,6 @@ static void close_connections(void) {
   Call_close_conn call_close_conn(true);
   thd_manager->do_for_all_thd(&call_close_conn);
 
-  // Must be called before ha_pre_dd_shutdown.ha_pre_dd_shutdown will close
-  // smartengine plugin and clone plugin.
-  stop_consistent_archive();
-  stop_binlog_archive();
-  stop_binlog_archive_replica();
-
   (void)RUN_HOOK(server_state, after_server_shutdown, (nullptr));
 
   /*
@@ -2573,9 +2500,6 @@ void clean_up_mysqld_mutexes() { clean_up_mutexes(); }
 static void mysqld_exit(int exit_code) {
   assert((exit_code >= MYSQLD_SUCCESS_EXIT && exit_code <= MYSQLD_ABORT_EXIT) ||
          exit_code == MYSQLD_RESTART_EXIT);
-  (Binlog_archive::get_instance())->deinit_pthread_object();
-  (Consistent_archive::get_instance())->deinit_pthread_object();
-  (Binlog_archive_replica::get_instance())->deinit_pthread_object();
   mysql_audit_finalize();
   Srv_session::module_deinit();
   delete_optimizer_cost_module();
@@ -4922,10 +4846,6 @@ int init_common_variables() {
   */
   mysql_bin_log.init_pthread_objects();
 
-  (Binlog_archive::get_instance())->init_pthread_object();
-  (Consistent_archive::get_instance())->init_pthread_object();
-  (Binlog_archive_replica::get_instance())->init_pthread_object();
-
   /* TODO: remove this when my_time_t is 64 bit compatible */
   if (!is_time_t_valid_for_timestamp(server_start_time)) {
     LogErr(ERROR_LEVEL, ER_UNSUPPORTED_DATE);
@@ -4968,12 +4888,6 @@ int init_common_variables() {
   default_storage_engine = "InnoDB";
   default_tmp_storage_engine = default_storage_engine;
 
-#ifdef WITH_SMARTENGINE
-  // Smartengine is the default storage engine of wesql.
-  if (!opt_initialize) {
-    default_storage_engine = SMARTENGINE_NAME;
-  }
-#endif // WITH_SMARTENGINE
   /*
     Add server status variables to the dynamic list of
     status variables that is shown by SHOW STATUS.
@@ -6401,14 +6315,6 @@ static int init_server_components() {
       opt_bin_logname = my_strdup(key_memory_opt_bin_logname, buf, MYF(0));
     }
 
-    // Recovery binlog from archive dir or object store.
-    // Must recovery binlog and index, before open index file first.
-    if (opt_serverless &&
-        consistent_recovery.recovery_binlog(opt_binlog_index_name, ln)) {
-      LogErr(ERROR_LEVEL, ER_CONSISTENT_SNAPSHOT_LOG,
-             "Failed to recovery binlog from object storage");
-      unireg_abort(MYSQLD_ABORT_EXIT);
-    }
     /*
       Skip opening the index file if we start with --help. This is necessary
       to avoid creating the file in an otherwise empty datadir, which will
@@ -6625,33 +6531,6 @@ static int init_server_components() {
     if (!opt_validate_config)
       LogErr(ERROR_LEVEL, ER_CANT_INITIALIZE_BUILTIN_PLUGINS);
     unireg_abort(1);
-  }
-  // innodb and smartengine are core plugins.
-  if (opt_serverless) {
-    // Consistent recovery innodb after innodb plugin is loaded.
-    if (consistent_recovery.recovery_mysql_innodb()) {
-      LogErr(ERROR_LEVEL, ER_CONSISTENT_SNAPSHOT_LOG,
-             "Failed to recovery innodb data from object storage");
-      unireg_abort(MYSQLD_ABORT_EXIT);
-    }
-    // Consistent recovery smartengine after smartengine plugin is loaded.
-    if (consistent_recovery.recovery_smartengine()) {
-      LogErr(ERROR_LEVEL, ER_CONSISTENT_SNAPSHOT_LOG,
-             "Failed to recovery smartengine data from object storage");
-      unireg_abort(MYSQLD_ABORT_EXIT);
-    }
-
-    // Consistent recovery smartengine sst when clone instance.
-    if (unlikely(opt_initialize) && opt_initialize_from_source_objectstore &&
-        consistent_recovery.recovery_smartengine_objectstore_data()) {
-      LogErr(ERROR_LEVEL, ER_CONSISTENT_SNAPSHOT_LOG,
-             "Failed to recovery smartengine sst from object storage");
-      unireg_abort(MYSQLD_ABORT_EXIT);
-    }
-    // Consistent recovery finish.
-    consistent_recovery.recovery_consistent_snapshot_finish();
-    if(unlikely(opt_initialize) && opt_initialize_from_source_objectstore) 
-      unireg_abort(MYSQLD_SUCCESS_EXIT);
   }
 
   /*
@@ -6989,19 +6868,6 @@ static int init_server_components() {
   /*
     Set the default storage engines
   */
-#ifdef WITH_SMARTENGINE
-  // In serverless mode, the storage engine of user tables is enforced to
-  // be smartengine, so the value of parameter default_storage_engine must
-  // be smartengine. Here, the degault storage engine is not implicitly
-  // change to smartengine, instead an error is raised. It's to avoid
-  // confusion in parameter configuration for default_storage_engine.
-  if (!opt_initialize && opt_serverless &&
-      (strlen(default_storage_engine) != strlen(SMARTENGINE_NAME) ||
-       0 != strncasecmp(default_storage_engine, SMARTENGINE_NAME, strlen(SMARTENGINE_NAME)))) {
-    LogErr(ERROR_LEVEL, ER_FORCE_DEFAULT_STORAGE_ENGINE_TO_SMARTENGINE, default_storage_engine);
-    unireg_abort(MYSQLD_ABORT_EXIT);
-  }
-#endif // WITH_SMARTENGINE
 
   if (initialize_storage_engine(default_storage_engine, "",
                                 &global_system_variables.table_plugin))
@@ -7072,14 +6938,6 @@ static int init_server_components() {
 
   if (rpl_encryption.initialize()) {
     LogErr(ERROR_LEVEL, ER_SERVER_RPL_ENCRYPTION_UNABLE_TO_INITIALIZE);
-    unireg_abort(MYSQLD_ABORT_EXIT);
-  }
-
-  // When Logger node startup, get last persisted binlog consensus index.
-  // Use the next consensus index of the last persisted binlog as logger a
-  // starting index.
-  if (!opt_initialize && opt_serverless &&
-      consistent_recovery.get_last_persistent_binlog_consensus_index()) {
     unireg_abort(MYSQLD_ABORT_EXIT);
   }
 
@@ -8023,16 +7881,6 @@ int mysqld_main(int argc, char **argv)
     unireg_abort(exit_state);
   }
 
-  // In recovery serverless mode, we first create the data directory if it does
-  // not exist. Otherwise, my_setwd will fail.
-  if (!is_help_or_validate_option() && opt_serverless &&
-      (!opt_initialize && opt_recovery_from_objstore)) {
-    MY_STAT stat;
-    if (!my_stat(mysql_real_data_home, &stat, MYF(0)) &&
-        initialize_create_data_directory(mysql_real_data_home))
-      unireg_abort(MYSQLD_ABORT_EXIT); /* purecov: inspected */
-  }
-
   /*
    We have enough space for fiddling with the argv, continue
   */
@@ -8043,63 +7891,6 @@ int mysqld_main(int argc, char **argv)
     LogErr(ERROR_LEVEL, ER_CANT_SET_DATA_DIR, mysql_real_data_home, errno,
            my_strerror(errbuf, sizeof(errbuf), errno));
     unireg_abort(MYSQLD_ABORT_EXIT); /* purecov: inspected */
-  }
-
-  // Check the validity of the UUID using the specified objstore_uuid
-  if (!is_help_or_validate_option() && opt_serverless &&
-      opt_repo_objstore_id != nullptr) {
-    if (*opt_repo_objstore_id == '\0') {
-      LogErr(ERROR_LEVEL, ER_OBJSTORE_ID_CHECK_ERROR, "invalid empty objectstore id");
-      unireg_abort(MYSQLD_ABORT_EXIT); /* purecov: inspected */
-    }
-    std::string err_msg;
-    std::string_view endpoint(
-        opt_objstore_endpoint ? std::string_view(opt_objstore_endpoint) : "");
-    if (objstore::ensure_object_store_lock(
-            std::string_view(opt_objstore_provider),
-            std::string_view(opt_objstore_region), &endpoint,
-            std::string_view(opt_objstore_bucket),
-            std::string_view(opt_repo_objstore_id),
-            std::string_view(opt_branch_objstore_id),
-            !opt_initialize || !opt_table_on_objstore, err_msg)) {
-      LogErr(ERROR_LEVEL, ER_OBJSTORE_ID_CHECK_ERROR, err_msg.c_str());
-      unireg_abort(MYSQLD_ABORT_EXIT); /* purecov: inspected */
-    }
-  }
-
-  // 1. Recovery from object store, if $data_home/mysql directory not exists.
-  // 2. Clone a new instance from object store.
-  // InnoDB data recovery will be done after innodb plugin is loaded.
-  // Smartengine recovery will be done after smartengine plugin is loaded.
-  // Binlog recovery will be done after bin-log and bin-log-index option is
-  // ready.
-  if (!is_help_or_validate_option() && opt_serverless &&
-      (opt_recovery_from_objstore || opt_initialize_from_source_objectstore)) {
-    Consistent_snapshot_recovery_status recovery_status = {};
-    if (consistent_recovery.read_consistent_snapshot_recovery_status(
-            recovery_status) == 0) {
-      // If recovery process is not completed, we need to recover from object
-      // store again.
-      if (consistent_recovery.recovery_consistent_snapshot(0))
-        unireg_abort(MYSQLD_ABORT_EXIT); /* purecov: inspected */
-    } else {
-      // Only check if mysql directory exists when in recovery mode.
-      char mysql_path[FN_REFLEN];
-      MY_STAT stat;
-      strmake(mysql_path, mysql_real_data_home, sizeof(mysql_path) - 1);
-      convert_dirname(mysql_path, mysql_path, NullS);
-      strcat(mysql_path, "mysql");
-      if ((opt_initialize && opt_initialize_from_source_objectstore) ||
-          (!opt_initialize && opt_recovery_from_objstore &&
-           !my_stat(mysql_path, &stat, MYF(0)))) {
-        // 1. If $datadir/mysql not exists, we need to recover from object
-        // store.
-        // 2. If opt_initialize_from_source_objectstore is set, we need to recover from
-        // object store.
-        if (consistent_recovery.recovery_consistent_snapshot(0))
-          unireg_abort(MYSQLD_ABORT_EXIT); /* purecov: inspected */
-      }
-    }
   }
 
   /*
@@ -8280,14 +8071,6 @@ int mysqld_main(int argc, char **argv)
     (void)RUN_HOOK(server_state, after_engine_recovery, (nullptr));
   }
 
-#ifdef WITH_SMARTENGINE
-  ha_post_engine_recover();
-#endif
-
-  if (!opt_initialize && opt_serverless) {
-    consistent_recovery.consistent_snapshot_consensus_recovery_finish();
-  }
-
   if (init_ssl_communication()) unireg_abort(MYSQLD_ABORT_EXIT);
   if (network_init()) unireg_abort(MYSQLD_ABORT_EXIT);
 
@@ -8429,15 +8212,6 @@ int mysqld_main(int argc, char **argv)
 #else
   (void)RUN_HOOK(server_state, after_recovery, (nullptr));
 #endif
-
-  // Start binlog and consistent snapshot thread, after consensus service.
-  // The consensus service is started within the `after_recovery` hook.
-  if (!opt_initialize) {
-    // start binlog archive and consistent snapshot archive.
-    if (start_binlog_archive() || start_consistent_archive()) {
-      unireg_abort(MYSQLD_ABORT_EXIT);
-    }
-  }
   
   if (Events::init(opt_noacl || opt_initialize))
     unireg_abort(MYSQLD_ABORT_EXIT);
@@ -8460,13 +8234,6 @@ int mysqld_main(int argc, char **argv)
     LogErr(ERROR_LEVEL, ER_CANT_SET_UP_PERSISTED_VALUES);
     flush_error_log_messages();
     return 1;
-  }
-
-  if (!opt_initialize) {
-    // start binlog archive replica.
-    if (start_binlog_archive_replica()) {
-      unireg_abort(MYSQLD_ABORT_EXIT);
-    }
   }
 
   /*

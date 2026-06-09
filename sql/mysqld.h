@@ -717,60 +717,6 @@ extern MYSQL_PLUGIN_IMPORT char pidfile_name[];
 
 #define mysql_tmpdir (my_tmpdir(&mysql_tmpdir_list))
 
-extern char *opt_repo_objstore_id;
-extern char *opt_branch_objstore_id;
-extern char *opt_server_id_on_objstore;
-extern bool consistent_recovery_consensus_recovery;
-extern uint64_t consistent_recovery_snapshot_end_binlog_position;
-extern uint64_t consistent_recovery_snasphot_end_consensus_index;
-extern char consistent_recovery_apply_stop_timestamp[MAX_DATETIME_FULL_WIDTH + 4];
-extern char consistent_recovery_consensus_truncated_end_binlog[FN_REFLEN + 1];
-extern my_off_t consistent_recovery_consensus_truncated_end_position;
-extern ulong opt_binlog_archive_slice_max_size;
-extern bool opt_binlog_archive;
-extern char *opt_binlog_archive_dir;
-extern bool opt_binlog_archive_using_consensus_index;
-extern bool opt_binlog_archive_expire_auto_purge;
-extern ulong opt_binlog_archive_expire_seconds;
-extern ulonglong opt_binlog_archive_period;
-extern ulong opt_binlog_archive_parallel_workers;
-extern bool opt_binlog_archive_replica;
-extern ulong opt_binlog_archive_replica_flush_period;
-extern char *opt_binlog_archive_replica_source_log_file;
-extern ulong opt_binlog_archive_replica_source_log_pos;
-extern char *opt_consistent_snapshot_archive_dir;
-extern bool opt_consistent_snapshot_persistent_on_objstore;
-extern bool opt_initialize_use_objstore;
-extern bool opt_consistent_snapshot_archive;
-extern ulong opt_consistent_snapshot_archive_period;
-extern bool opt_consistent_snapshot_expire_auto_purge;
-extern ulong opt_consistent_snapshot_expire_seconds;
-extern ulong opt_consistent_snapshot_se_tar_mode;
-extern ulong opt_consistent_snapshot_innodb_tar_mode;
-extern bool opt_consistent_snapshot_smartengine_backup_checkpoint;
-extern bool opt_recovery_from_objstore;
-extern char *opt_recovery_consistent_snapshot_tmpdir;
-extern bool opt_recovery_consistent_snapshot_only;
-extern char *opt_recovery_consistent_snapshot_timestamp;
-extern bool opt_initialize_from_source_objectstore;
-extern char *opt_source_objectstore_provider;
-extern char *opt_source_objectstore_region;
-extern char *opt_source_objectstore_endpoint;
-extern bool opt_source_objectstore_use_https;
-extern char *opt_source_objectstore_bucket;
-extern char *opt_source_objectstore_repo_id;
-extern char *opt_source_objectstore_branch_id;
-extern bool opt_source_objectstore_smartengine_data;
-
-extern MYSQL_PLUGIN_IMPORT bool opt_serverless;
-extern MYSQL_PLUGIN_IMPORT bool opt_table_on_objstore;
-extern MYSQL_PLUGIN_IMPORT uint opt_objstore_lease_lock_timeout;
-extern MYSQL_PLUGIN_IMPORT char *opt_objstore_provider;
-extern MYSQL_PLUGIN_IMPORT char *opt_objstore_region;
-extern MYSQL_PLUGIN_IMPORT char *opt_objstore_endpoint;
-extern MYSQL_PLUGIN_IMPORT bool opt_objstore_use_https;
-extern MYSQL_PLUGIN_IMPORT char *opt_objstore_bucket;
-
 /*
   Server mutex locks and condition variables.
  */

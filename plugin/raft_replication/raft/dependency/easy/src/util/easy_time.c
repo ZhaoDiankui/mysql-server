@@ -86,5 +86,12 @@ int64_t easy_time_now()
 {
     struct timeval          tv;
     gettimeofday (&tv, 0);
+#ifndef __INT64_C
+#if __WORDSIZE == 64
+#define __INT64_C(c) c ## L
+#else
+#define __INT64_C(c) c ## LL
+#endif
+#endif
     return __INT64_C(1000000) * tv.tv_sec + tv.tv_usec;
 }

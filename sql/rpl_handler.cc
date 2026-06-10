@@ -1431,8 +1431,7 @@ int Binlog_applier_delegate::on_stmt_done(Relay_log_info *rli) {
   int ret = 0;
   FOREACH_OBSERVER(ret, on_stmt_done, (&param));
   return ret;
-};
-
+}
 int Binlog_applier_delegate::on_commit_positions(Relay_log_info *rli,
                                                  Slave_job_group *ptr_g,
                                                  bool check_xa) {

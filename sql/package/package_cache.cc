@@ -63,7 +63,7 @@ static const T *find_package_element(const std::string &schema_name,
   return Package::instance()->lookup_element<T>(schema_name, element_name);
 }
 /* Template instantiation */
-template static const Proc *find_package_element(
+template const Proc *find_package_element(
     const std::string &schema_name, const std::string &element_name);
 
 /**

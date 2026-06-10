@@ -325,6 +325,7 @@ static void *easy_io_on_thread_start(void *args)
 
     // sched_setaffinity
     if (eio->affinity_enable) {
+#ifndef __APPLE__
         static easy_atomic_t    cpuid = -1;
         int                     cpunum = sysconf(_SC_NPROCESSORS_CONF);
         cpu_set_t               mask;
@@ -335,6 +336,7 @@ static void *easy_io_on_thread_start(void *args)
         if (sched_setaffinity(0, sizeof(mask), &mask) == -1) {
             easy_error_log("sched_setaffinity error: %d (%s), cpuid=%d\n", errno, strerror(errno), cpuid);
         }
+#endif
     }
 
     // 有listen

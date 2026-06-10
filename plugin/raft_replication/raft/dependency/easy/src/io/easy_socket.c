@@ -1,6 +1,8 @@
 #include <sys/ioctl.h>
 #include <netinet/tcp.h>
+#ifdef __linux__
 #include <sys/sendfile.h>
+#endif
 #include <sys/uio.h>
 #include "easy_socket.h"
 #include "easy_io.h"
@@ -25,8 +27,12 @@ int easy_socket_listen(int udp, easy_addr_t *address, int *flags, int backlog)
 
     if (udp == 0) {
         if ((*flags & EASY_FLAGS_DEFERACCEPT)) {
+#ifdef TCP_DEFER_ACCEPT
             easy_socket_set_tcpopt(fd, TCP_DEFER_ACCEPT, 1);
+#endif
+#ifdef TCP_SYNCNT
             easy_socket_set_tcpopt(fd, TCP_SYNCNT, 2);
+#endif
         }
     }
 

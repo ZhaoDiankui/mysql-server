@@ -168,7 +168,9 @@
 #endif
 
 #if defined __aarch64__
+#ifdef __linux__
 #include <sys/eventfd.h>
+#endif
 #endif
 #include <math.h>
 #include <stdlib.h>
@@ -183,7 +185,9 @@
 #include <sys/types.h>
 #include <time.h>
 #include <limits.h>
+#ifdef __linux__
 #include <syscall.h>
+#endif
 #include <signal.h>
 
 #ifdef EV_H
@@ -1297,8 +1301,16 @@ EV_CPP(extern "C" {
 
                 fd_intern (evpipe [0]);
                 fd_intern (evpipe [1]);
-                fcntl (evpipe [0], F_SETFL, O_NONBLOCK | O_NOATIME);
-                fcntl (evpipe [1], F_SETFL, O_NONBLOCK | O_NOATIME);
+                fcntl (evpipe [0], F_SETFL, O_NONBLOCK
+#ifdef O_NOATIME
+                    | O_NOATIME
+#endif
+                    );
+                fcntl (evpipe [1], F_SETFL, O_NONBLOCK
+#ifdef O_NOATIME
+                    | O_NOATIME
+#endif
+                    );
                 ev_io_set (&pipe_w, evpipe [0], EV_READ);
             }
 

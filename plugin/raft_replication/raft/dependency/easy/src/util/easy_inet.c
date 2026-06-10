@@ -3,7 +3,11 @@
 #include <netdb.h>
 #include <arpa/inet.h>      // inet_addr
 #include <sys/ioctl.h>
+#ifdef __linux__
 #include <linux/if.h>
+#elif defined(__APPLE__)
+#include <net/if.h>
+#endif
 #include "util/easy_inet.h"
 #include "util/easy_string.h"
 #include "easy_atomic.h"
@@ -132,8 +136,14 @@ int easy_inet_parse_host(easy_addr_t *addr, const char *host, int port)
             char                    buffer[1024];
             struct  hostent         h, *hp;
 
+#ifdef __APPLE__
+            hp = gethostbyname(host);
+            if (hp == NULL)
+                return EASY_ERROR;
+#else
             if (gethostbyname_r(host, &h, buffer, 1024, &hp, &rc) || hp == NULL)
                 return EASY_ERROR;
+#endif
 
             if (hp->h_addrtype == AF_INET6) {
                 family = AF_INET6;

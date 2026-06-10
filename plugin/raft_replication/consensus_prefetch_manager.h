@@ -28,7 +28,15 @@
 #include "mysql/psi/mysql_rwlock.h"
 #include "sql/mysqld.h"
 
-struct ConsensusLogEntry;
+struct ConsensusLogEntry {
+  uint64 term;
+  uint64 index;
+  size_t buf_size;
+  uchar *buffer;
+  bool outer; /* whether created by consensus module */
+  uint flag;  /* atomic flag marked */
+  uint64 checksum;
+};
 
 class ConsensusPreFetchChannel {
  public:

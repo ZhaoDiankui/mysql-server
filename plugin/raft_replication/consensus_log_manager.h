@@ -41,16 +41,6 @@ enum Consensus_log_event_flag {
   FLAG_ROTATE = 1 << 8
 };
 
-struct ConsensusLogEntry {
-  uint64 term;
-  uint64 index;
-  size_t buf_size;
-  uchar *buffer;
-  bool outer; /* whether created by consensus module */
-  uint flag;  /* atomic flag marked */
-  uint64 checksum;
-};
-
 class ConsensusLogManager {
  public:
   ConsensusLogManager()

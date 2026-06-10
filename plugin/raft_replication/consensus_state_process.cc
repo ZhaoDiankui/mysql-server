@@ -505,8 +505,7 @@ static uint64 get_applier_start_index() {
       return 0;
     }
 
-    if (opt_cluster_recover_from_backup ||
-        consistent_recovery_consensus_recovery || recovery_applied_index == 0) {
+    if (opt_cluster_recover_from_backup || recovery_applied_index == 0) {
       next_index = recovery_applied_index < first_index
                        ? first_index
                        : consensus_log_manager.get_next_trx_index(
@@ -686,10 +685,7 @@ int ConsensusStateProcess::recovery_applier_status() {
 
   // Reached this, the applier start index of consensus is set
   if (gtid_init_after_consensus_setup(
-          next_index, (!consensus_log_manager.get_start_without_log() &&
-                       next_index > 0 && consistent_recovery_consensus_recovery)
-                          ? log_name
-                          : nullptr)) {
+          next_index, nullptr)) {
     return -1;
   }
 

@@ -16,7 +16,9 @@ EASY_CPP_START
 #define EASY_FLAGS_REUSEPORT   0x002
 #define EASY_FLAGS_SREUSEPORT  0x004
 #define EASY_FLAGS_NOLISTEN    0x008
+#ifndef SO_REUSEPORT
 #define SO_REUSEPORT 15
+#endif
 int easy_socket_listen(int udp, easy_addr_t *address, int *flags, int backlog);
 int easy_socket_write(easy_connection_t *c, easy_list_t *l);
 int easy_socket_read(easy_connection_t *c, char *buf, int size, int *pending);

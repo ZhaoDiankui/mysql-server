@@ -21,7 +21,7 @@
 
 class THD;
 class MYSQL_BIN_LOG;
-class Trans_context_info;
+struct Trans_context_info;
 
 typedef struct Binlog_context_info {
   MYSQL_BIN_LOG *binlog;

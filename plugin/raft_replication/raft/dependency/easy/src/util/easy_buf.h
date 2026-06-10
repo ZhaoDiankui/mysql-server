@@ -20,7 +20,7 @@ typedef void (easy_buf_cleanup_pt)(easy_buf_t *, void *);
     void                    *args;
 
 struct easy_buf_t {
-    EASY_BUF_DEFINE;
+    EASY_BUF_DEFINE
     char                    *pos;
     char                    *last;
     char                    *end;

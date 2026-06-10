@@ -174,6 +174,39 @@ static __inline__ void easy_spin_lock(easy_spin_t *lock)
         sched_yield();
     }
 }
+#elif defined(__APPLE__)
+/* macOS does not support pthread_spinlock_t, use custom spinlock */
+#define easy_spin_t easy_atomic_t
+#define EASY_SPIN_INITER (0)
+#define easy_trylock(lock)  (*(lock) == 0 && easy_atomic_cmp_set(lock, 0, 1))
+#define easy_spin_unlock easy_unlock
+static __inline__ void easy_spin_lock(easy_spin_t *lock)
+{
+    int                     i, n;
+
+    for ( ; ; ) {
+        if (*lock == 0 && easy_atomic_cmp_set(lock, 0, 1)) {
+            return;
+        }
+
+        for (n = 1; n < 1024; n <<= 1) {
+
+            for (i = 0; i < n; i++) {
+#if defined __x86_64__
+                __asm__ (".byte 0xf3, 0x90");
+#elif defined __aarch64__
+                __asm__ ("dsb ish" ::: "memory");
+#endif
+            }
+
+            if (*lock == 0 && easy_atomic_cmp_set(lock, 0, 1)) {
+                return;
+            }
+        }
+
+        sched_yield();
+    }
+}
 #else
 #include <pthread.h>
 #define easy_spin_t pthread_spinlock_t

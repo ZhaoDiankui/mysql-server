@@ -49,14 +49,8 @@ static int consensus_binlog_manager_binlog_recovery(
 
   return opt_initialize
              ? 0
-             : (consistent_recovery_consensus_recovery
-                    ? consensus_binlog_recovery(
-                          param->binlog, true,
-                          (uint64)consistent_recovery_snasphot_end_consensus_index,
-                          consistent_recovery_consensus_truncated_end_binlog,
-                          &consistent_recovery_consensus_truncated_end_position)
-                    : consensus_binlog_recovery(param->binlog, false, 0,
-                                                nullptr, nullptr));
+             : consensus_binlog_recovery(param->binlog, false, 0,
+                                                nullptr, nullptr);
 }
 
 static int consensus_binlog_manager_after_binlog_recovery(
@@ -81,12 +75,6 @@ static int consensus_binlog_manager_after_binlog_recovery(
   mysql_mutex_lock(log_lock);
 
   if (binlog_file_list.empty()) {
-    if (opt_serverless && opt_cluster_log_type_instance) {
-      /* Use the next index of the last persisted binlog as a starting index */
-      consensus_log_manager.set_current_index(
-          consistent_recovery_snasphot_end_consensus_index + 1);
-    }
-
     if (param->binlog->open_binlog(opt_bin_logname, nullptr, max_binlog_size,
                                    false, true /*need_lock_index=true*/,
                                    true /*need_sid_lock=true*/, nullptr)) {

@@ -249,7 +249,6 @@ else
       -DWITH_PERFSCHEMA_STORAGE_ENGINE=1 \
       -DWITH_EXAMPLE_STORAGE_ENGINE=0    \
       -DWITH_TEMPTABLE_STORAGE_ENGINE=1  \
-      -DWITH_SMARTENGINE_STORAGE_ENGINE=1    \
       -DWITH_QUERY_TRACE=1               \
       -DWITH_EXTRA_CHARSETS=all          \
       -DDEFAULT_CHARSET=utf8mb4          \
@@ -263,13 +262,19 @@ else
       -DMYSQL_SERVER_SUFFIX="$server_suffix"         \
       -DWITH_UNIT_TESTS=0 \
       -DWITH_CLONE=1 \
-      -DWITH_JEMALLOC=1 \
+      -DWITH_JEMALLOC=0 \
       -DWITH_WESQL=1 \
       -DWITH_CONSENSUS_REPLICATION=1
 
 fi
 
-make -j$(nproc)
+if [[ "$(uname)" == "Darwin" ]]; then
+    NPROC=$(sysctl -n hw.logicalcpu)
+else
+    NPROC=$(nproc)
+fi
+
+make -j"${NPROC}"
 
 # set mtr binary directory
 echo "set mtr binary directory: $PWD"

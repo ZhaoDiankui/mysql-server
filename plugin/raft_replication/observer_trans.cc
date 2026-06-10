@@ -54,9 +54,6 @@ int consensus_replication_trans_before_dml(Trans_param *param, int &out) {
    */
   for (uint table = 0; out == 0 && table < param->number_of_tables; table++) {
     if (param->tables_info[table].db_type != DB_TYPE_INNODB
-#ifdef WITH_SMARTENGINE
-        && param->tables_info[table].db_type != DB_TYPE_SMARTENGINE
-#endif
     ) {
 #ifndef WESQL_TEST
       LogPluginErr(ERROR_LEVEL, ER_CONSENSUS_RPL_NEEDS_TRANSACTIONAL_TABLE,

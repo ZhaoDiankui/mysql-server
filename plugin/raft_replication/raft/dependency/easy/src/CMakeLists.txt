@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 3.5)
 
 SET (HEADER_FILE
   util/easy_hash.h
@@ -62,12 +62,12 @@ ADD_LIBRARY (myeasy STATIC ${PRJ_SRC})
 IF (CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
 TARGET_COMPILE_OPTIONS (myeasy PRIVATE
   -D_GNU_SOURCE -D__STDC_LIMIT_MACROS
-  $<$<COMPILE_LANGUAGE:C>:-g -Wall -Werror -Wno-extra -Wno-error=vla -Wno-error=jump-misses-init -Wno-write-strings -Wno-error=undef -Wno-error=implicit-fallthrough= -Wno-error=sign-compare -Wno-error=unused-parameter -Wno-error=discarded-qualifiers -Wno-error=unused-but-set-variable -fPIC -fno-strict-aliasing>
+  $<$<COMPILE_LANGUAGE:C>:-g -Wall -Wno-extra -Wno-error=vla -Wno-write-strings -Wno-error=undef -Wno-error=implicit-fallthrough -Wno-error=sign-compare -Wno-error=unused-parameter -Wno-error=unused-but-set-variable -fPIC -fno-strict-aliasing>
 )
 ELSE()
 TARGET_COMPILE_OPTIONS (myeasy PRIVATE
   -D_GNU_SOURCE -D__STDC_LIMIT_MACROS -DEASY_SPIN_USE_SYS
-  $<$<COMPILE_LANGUAGE:C>:-g -Wall -Werror -Wno-extra -Wno-error=vla -Wno-error=jump-misses-init -Wno-write-strings -Wno-error=undef -Wno-error=implicit-fallthrough= -Wno-error=sign-compare -Wno-error=unused-parameter -Wno-error=discarded-qualifiers -Wno-error=unused-but-set-variable -fPIC -fno-strict-aliasing>
+  $<$<COMPILE_LANGUAGE:C>:-g -Wall -Wno-extra -Wno-error=vla -Wno-write-strings -Wno-error=undef -Wno-error=implicit-fallthrough -Wno-error=sign-compare -Wno-error=unused-parameter -Wno-error=unused-but-set-variable -fPIC -fno-strict-aliasing>
 )
 ENDIF()
 

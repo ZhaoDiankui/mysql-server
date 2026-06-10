@@ -1,5 +1,13 @@
 #include "util/easy_string.h"
 
+#ifndef __UINT64_C
+#if __WORDSIZE == 64
+#define __UINT64_C(c) c ## UL
+#else
+#define __UINT64_C(c) c ## ULL
+#endif
+#endif
+
 static char *easy_sprintf_num(char *buf, char *last, uint64_t ui64, char zero, int hexadecimal, int width, int sign);
 static char *easy_fill_space(int width, char *buf, char *fstart, char *last);
 
@@ -261,8 +269,8 @@ int easy_vsnprintf(char *buf, size_t size, const char *fmt, va_list args)
 {
     char                    *p, zero;
     double                  f, scale;
-    int64_t                 i64;
-    uint64_t                ui64;
+    int64_t                 i64 = 0;
+    uint64_t                ui64 = 0;
     int                     width, sign, hex, frac_width, slen, width_sign;
     char                    *last, *start, *fstart;
     char                    length_modifier;

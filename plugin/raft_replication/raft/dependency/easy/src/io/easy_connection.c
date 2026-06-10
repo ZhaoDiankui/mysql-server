@@ -939,7 +939,9 @@ static int easy_connection_do_response(easy_message_t *m)
             if (m->status != EASY_ERROR) {
                 // quickack
                 if (EASY_IOTH_SELF->eio->no_delayack && m->next_read_len < EASY_MSS) {
+#ifdef TCP_QUICKACK
                     easy_socket_set_tcpopt(c->fd, TCP_QUICKACK, 1);
+#endif
                 }
 
                 break;
@@ -1059,7 +1061,9 @@ static int easy_connection_do_request(easy_message_t *m)
             if (m->status != EASY_ERROR) {
                 // quickack
                 if ( EASY_IOTH_SELF->eio->no_delayack && m->next_read_len < EASY_MSS) {
+#ifdef TCP_QUICKACK
                     easy_socket_set_tcpopt(c->fd, TCP_QUICKACK, 1);
+#endif
                 }
 
                 break;
@@ -1311,7 +1315,11 @@ int easy_connection_write_socket(easy_connection_t *c)
 
     // 加塞
     if (EASY_IOTH_SELF->eio->tcp_cork && c->tcp_cork_flag == 0) {
+#ifdef TCP_CORK
         easy_socket_set_tcpopt(c->fd, TCP_CORK, 1);
+#elif defined(TCP_NOPUSH)
+        easy_socket_set_tcpopt(c->fd, TCP_NOPUSH, 1);
+#endif
         c->tcp_cork_flag = 1;
     }
 
@@ -1358,7 +1366,11 @@ int easy_connection_write_again(easy_connection_t *c)
 
         // tcp_cork
         if (EASY_IOTH_SELF->eio->tcp_cork && c->tcp_cork_flag) {
+#ifdef TCP_CORK
             easy_socket_set_tcpopt(c->fd, TCP_CORK, 0);
+#elif defined(TCP_NOPUSH)
+            easy_socket_set_tcpopt(c->fd, TCP_NOPUSH, 0);
+#endif
             c->tcp_cork_flag = 0;
         }
     }
@@ -1624,7 +1636,9 @@ static easy_connection_t *easy_connection_do_connect(easy_client_t *client, int 
         easy_socket_set_tcpopt(fd, TCP_NODELAY, 1);
     }
 
-    if (connect(fd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+    socklen_t addr_len = (addr.ss_family == AF_INET6) ?
+        sizeof(struct sockaddr_in6) : sizeof(struct sockaddr_in);
+    if (connect(fd, (struct sockaddr *)&addr, addr_len) < 0) {
         if (errno != EINPROGRESS) {
             easy_error_log("connect to %s failure: %s (%d)\n", easy_connection_str(c), strerror(errno), errno);
             goto error_exit;
@@ -1850,7 +1864,9 @@ static void easy_connection_autoconn(easy_connection_t *c)
         easy_socket_set_tcpopt(fd, TCP_NODELAY, 1);
     }
 
-    if (connect(fd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+    socklen_t addr_len = (addr.ss_family == AF_INET6) ?
+        sizeof(struct sockaddr_in6) : sizeof(struct sockaddr_in);
+    if (connect(fd, (struct sockaddr *)&addr, addr_len) < 0) {
         if (errno != EINPROGRESS) {
             easy_error_log("connect to '%s' failure: %s (%d)\n", easy_connection_str(c), strerror(errno), errno);
             close(fd);

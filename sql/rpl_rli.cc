@@ -3710,6 +3710,22 @@ int Relay_log_info::cli_init_info(bool force_retriever_gtid) {
     relay_log.set_previous_gtid_set_relaylog(gtid_set);
 
     relay_log.is_relay_log = false;
+
+    /*
+      note, that if open() fails, we'll still have index file open
+      but a destructor will take care of that
+    */
+    mysql_mutex_t *log_lock = relay_log.get_log_lock();
+    mysql_mutex_lock(log_lock);
+
+    if (relay_log.open_exist_consensus_binlog(ln, max_binlog_size, true,
+                                              true)) {
+      mysql_mutex_unlock(log_lock);
+      LogErr(ERROR_LEVEL, ER_RPL_CANT_OPEN_LOG_IN_AM_INIT_INFO);
+      return 1;
+    }
+
+    mysql_mutex_unlock(log_lock);
   }
 
   /*

@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2009, 2024, Oracle and/or its affiliates.
+   Copyright (c) 2009, 2026, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -94,7 +94,9 @@ class Ndbinfo {
     CPUDATA_20SEC_TABLEID = 48,
     CERTIFICATES_TABLEID = 49,
     THREADBLOCK_DETAILS_TABLEID = 50,
-    TRANSPORTER_DETAILS_TABLEID = 51
+    TRANSPORTER_DETAILS_TABLEID = 51,
+    TRANSACTIONS_FULL_TABLEID = 52,
+    TRANSPORTER_ACTIVITY_TABLEID = 53
   };
 
   enum BufferId {
@@ -132,7 +134,7 @@ class Ndbinfo {
     } m;
     Column col[1];
 
-    int columns(void) const { return m.ncols; }
+    int columns() const { return m.ncols; }
   };
   static int getNumTableEntries();
   static const Table *getTable(int i);
@@ -150,7 +152,7 @@ class Ndbinfo {
    public:
     Row(class Signal *signal, DbinfoScanReq &req);
 
-    Uint32 getLength(void) const { return (Uint32)(curr - start); }
+    Uint32 getLength() const { return (Uint32)(curr - start); }
 
     Uint32 *getDataPtr() const { return start; }
 
@@ -159,7 +161,7 @@ class Ndbinfo {
     void write_uint32(Uint32 value);
     void write_uint64(Uint64 value);
 
-    int columns(void) const { return col_counter; }
+    int columns() const { return col_counter; }
 
    private:
     bool check_buffer_space(class AttributeHeader &ah) const;
@@ -203,7 +205,8 @@ class Ndbinfo {
     friend class SimulatedBlock;
     Uint32 rows;
     Uint32 bytes;
-    Ratelimit(const Ratelimit &);  // Not impl
+    Ratelimit(const Ratelimit &) = delete;
+
    public:
     Ratelimit() : rows(0), bytes(0) {}
 

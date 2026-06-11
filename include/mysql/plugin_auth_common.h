@@ -1,5 +1,5 @@
 #ifndef MYSQL_PLUGIN_AUTH_COMMON_INCLUDED
-/* Copyright (c) 2010, 2024, Oracle and/or its affiliates.
+/* Copyright (c) 2010, 2026, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -42,6 +42,20 @@
   return values of the plugin authenticate_user() method.
 */
 
+/**
+  Authentication failed, account locked error.
+  The account is locked.
+  These errors are reported in table performance_schema.host_cache,
+  column COUNT_ACCOUNT_LOCKED_ERRORS.
+*/
+#define CR_AUTH_ACCOUNT_LOCKED_ERROR 5
+/**
+  Authentication failed, temporary account locked error.
+  The account is temporarily locked.
+  These errors are reported in table performance_schema.host_cache,
+  column COUNT_TEMPORARY_ACCOUNT_LOCKED_ERRORS.
+*/
+#define CR_AUTH_TEMPORARY_ACCOUNT_LOCKED_ERROR 4
 /**
   Authentication failed, plugin internal error.
   An error occurred in the authentication plugin itself.
@@ -101,6 +115,12 @@
   authentication with very limited operations ALTER USER to do registration.
 */
 #define CR_OK_AUTH_IN_SANDBOX_MODE -3
+/**
+  Authentication was successful with limited operations.
+  User should change the password.
+*/
+#define CR_OK_FORCE_PASSWORD_CHANGE -4
+
 /**
 Flag to be passed back to server from authentication plugins via
 authenticated_as when proxy mapping should be done by the server.

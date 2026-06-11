@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1996, 2024, Oracle and/or its affiliates.
+Copyright (c) 1996, 2026, Oracle and/or its affiliates.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License, version 2.0, as published by the
@@ -528,6 +528,12 @@ struct dtype_t {
   bool is_mtype_valid() const;
 
   std::ostream &print(std::ostream &out) const;
+
+  std::string to_string() const {
+    std::ostringstream sout;
+    print(sout);
+    return sout.str();
+  }
 };
 
 inline std::ostream &operator<<(std::ostream &out, const dtype_t &obj) {

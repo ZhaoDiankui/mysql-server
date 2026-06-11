@@ -1,4 +1,4 @@
-/* Copyright (c) 2017, 2024, Oracle and/or its affiliates.
+/* Copyright (c) 2017, 2026, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -78,11 +78,7 @@
 #include "sql_string.h"
 #include "template_utils.h"
 
-/**
-  Shallow clone the list of ORDER objects using mem_root and return
-  the cloned list.
-*/
-static ORDER *clone(THD *thd, ORDER *order) {
+ORDER *clone(THD *thd, ORDER *order) {
   ORDER *clone = nullptr;
   ORDER **prev_next = &clone;
   for (; order != nullptr; order = order->next) {
@@ -205,12 +201,24 @@ static Item_cache *make_result_item(Item *value) {
       result = new Item_cache_decimal();
       break;
     case STRING_RESULT:
-      if (value->is_temporal())
-        result = new Item_cache_datetime(value->data_type());
-      else if (value->data_type() == MYSQL_TYPE_JSON)
-        result = new Item_cache_json();
-      else
-        result = new Item_cache_str(value);
+      switch (value->data_type()) {
+        case MYSQL_TYPE_JSON:
+          result = new Item_cache_json();
+          break;
+        case MYSQL_TYPE_TIME:
+          result = new Item_cache_time();
+          break;
+        case MYSQL_TYPE_DATE:
+          result = new Item_cache_date();
+          break;
+        case MYSQL_TYPE_DATETIME:
+        case MYSQL_TYPE_TIMESTAMP:
+          result = new Item_cache_datetime(value->data_type());
+          break;
+        default:
+          result = new Item_cache_str(value);
+          break;
+      }
       break;
     default:
       assert(false);
@@ -255,6 +263,11 @@ bool Window::setup_range_expressions(THD *thd) {
       if (m_frame->m_to->m_border_type == WBT_CURRENT_ROW)
         m_frame->m_to->m_border_type = WBT_UNBOUNDED_FOLLOWING;
     }
+  } else if (o->value.first->item_initial->is_non_deterministic()) {
+    // With RANGE frame, the ordering must be monotonically ascending or
+    // descending, so forbid non-deterministic expressions.
+    my_error(ER_WINDOW_RANGE_FRAME_ORDER_TYPE, MYF(0), printable_name());
+    return true;
   }
 
   for (PT_border *border : {m_frame->m_from, m_frame->m_to}) {
@@ -1533,8 +1546,13 @@ void Window::apply_temp_table(THD *thd, const Func_ptr_array &items_to_copy,
   // ordering and partitioning items. We need to see through them, so we unwrap
   // them here. Since they get removed on the first call to apply_temp_table(),
   // only unwrap on the first call.
+  // Items might not always be of type Item_ref. set_cmp_func() creates cached
+  // items based on the type of comparison for these types. Therefore,
+  // unwrapping should occur only when the item is an Item_ref.
   const auto unwrap = [first](Item *item) {
-    return first ? down_cast<Item_ref *>(item)->ref_item() : item;
+    return (first && item->type() == Item::REF_ITEM)
+               ? down_cast<Item_ref *>(item)->ref_item()
+               : item;
   };
 
   for (Mem_root_array<Cached_item *> *cached_items :

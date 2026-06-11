@@ -32,7 +32,7 @@ SET debug = '-d,handlerton_supports_distance_scan';
 EXPLAIN FORMAT=TREE SELECT ST_Distance(location, POINT(0,0)) as d FROM cafe ORDER BY d ASC;
 EXPLAIN
 -> Sort: d  (rows=14)
-    -> Table scan on cafe  (rows=14)
+    -> Index scan on cafe using PRIMARY  (rows=14)
 
 SET debug = '+d,handlerton_supports_distance_scan';
 SELECT ST_Distance(location, ST_GEOMFROMTEXT('Point(0 0)', 4326)) as d FROM cafe ORDER BY d ASC;
@@ -77,20 +77,22 @@ test.cafe2	analyze	status	OK
 EXPLAIN FORMAT=TREE SELECT ST_AsText(location1), ST_AsText(location2), ST_Distance(location1, location2) as d FROM cafe2 ORDER BY d ASC LIMIT 5;
 EXPLAIN
 -> Sort: d, limit input to 5 row(s) per chunk  (rows=5)
-    -> Table scan on cafe2  (rows=14)
+    -> Index scan on cafe2 using PRIMARY  (rows=14)
 
 EXPLAIN FORMAT=TREE SELECT ST_AsText(location1), ST_AsText(location2), ST_Distance(location1, POINT(0,0)) as d1,
 ST_Distance(location2, POINT(0,0)) as d2 FROM cafe2 ORDER BY d1, d2 ASC;
 EXPLAIN
 -> Sort: d1, d2  (rows=14)
-    -> Table scan on cafe2  (rows=14)
+    -> Index distance scan on cafe2 using location1  (rows=14)
 
 SET optimizer_trace="enabled=on";
 EXPLAIN FORMAT=TREE SELECT cafe.id, ST_Distance(location, POINT(0,0)) as d FROM cafe JOIN cafe2 ON cafe2.id=cafe.id ORDER BY d;
 EXPLAIN
--> Nested loop inner join  (rows=14)
-    -> Index distance scan on cafe using location  (rows=14)
-    -> Single-row covering index lookup on cafe2 using PRIMARY (id = cafe.id)  (rows=1)
+-> Sort: d  (rows=14)
+    -> Inner hash join (cafe2.id = cafe.id)  (rows=14)
+        -> Index distance scan on cafe using location  (rows=14)
+        -> Hash
+            -> Covering index scan on cafe2 using PRIMARY  (rows=14)
 
 DROP TABLE cafe;
 DROP TABLE cafe2;

@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2010, 2024, Oracle and/or its affiliates.
+   Copyright (c) 2010, 2026, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -25,7 +25,10 @@
 
 package com.mysql.clusterj.core.util;
 
-import java.util.*;
+import java.util.function.Supplier;
+import java.util.Hashtable;
+import java.util.Locale;
+import java.util.ResourceBundle;
 import java.text.MessageFormat;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
@@ -194,6 +197,17 @@ public class I18NHelper {
         return getMessage (bundle, messageKey, args);
     }
 
+    /** Message formatter returning a Supplier<String>
+     *
+     *  NOTE: This can be used to work around the fact that a variable in a
+     *  closure must be "effectively final". But it should be used sparingly;
+     *  it can provide an illusion of efficiency that it doesn't really deliver.
+     */
+    public Supplier<String> supplier (String messageKey, Object... args) {
+        assertBundle (messageKey);
+        return () -> getMessage (bundle, messageKey, args);
+    }
+
     /** Message formatter
      * @param messageKey the message key
      * @param arg the argument
@@ -306,7 +320,7 @@ public class I18NHelper {
         for (int i=0; i<msgArgs.length; i++) {
             if (msgArgs[i] == null) msgArgs[i] = ""; // NOI18N
         }
-        MessageFormat formatter = new MessageFormat(messages.getString(messageKey));
+        MessageFormat formatter = new MessageFormat(messages.getString(messageKey), messages.getLocale());
         return formatter.format(msgArgs);
     }
     

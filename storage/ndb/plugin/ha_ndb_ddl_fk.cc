@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2011, 2024, Oracle and/or its affiliates.
+   Copyright (c) 2011, 2026, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -1704,7 +1704,12 @@ int ha_ndbcluster::inplace__drop_fks(THD *thd, Ndb *ndb, const char *dbname,
   }
 
   for (const Alter_drop *drop_item : thd->lex->alter_info->drop_list) {
-    if (drop_item->type != Alter_drop::FOREIGN_KEY) continue;
+    DBUG_PRINT("info", ("drop_item: name=%s type=%u", drop_item->name,
+                        drop_item->type));
+    const bool skip =
+        drop_item->type != Alter_drop::FOREIGN_KEY &&   // drop fk
+        drop_item->type != Alter_drop::ANY_CONSTRAINT;  // drop constraint
+    if (skip) continue;
 
     bool found = false;
     for (unsigned i = 0; i < obj_list.count; i++) {
@@ -1955,17 +1960,21 @@ bool ha_ndbcluster::has_fk_dependency(
         DBUG_PRINT("error", ("Could not find the listed fk '%s'", e.name));
         continue;
       }
-      for (unsigned j = 0; j < fk.getParentColumnCount(); j++) {
-        const NdbDictionary::Column *col =
-            m_table->getColumn(fk.getParentColumnNo(j));
-        DBUG_PRINT("col", ("[%u] %s", i, col->getName()));
-        if (col == column) return true;
+      if (fk.isParentTable(m_table)) {
+        for (unsigned j = 0; j < fk.getParentColumnCount(); j++) {
+          const NdbDictionary::Column *col =
+              m_table->getColumn(fk.getParentColumnNo(j));
+          DBUG_PRINT("col", ("[%u] %s", j, col->getName()));
+          if (col == column) return true;
+        }
       }
-      for (unsigned j = 0; j < fk.getChildColumnCount(); j++) {
-        const NdbDictionary::Column *col =
-            m_table->getColumn(fk.getChildColumnNo(j));
-        DBUG_PRINT("col", ("[%u] %s", i, col->getName()));
-        if (col == column) return true;
+      if (fk.isChildTable(m_table)) {
+        for (unsigned j = 0; j < fk.getChildColumnCount(); j++) {
+          const NdbDictionary::Column *col =
+              m_table->getColumn(fk.getChildColumnNo(j));
+          DBUG_PRINT("col", ("[%u] %s", j, col->getName()));
+          if (col == column) return true;
+        }
       }
     }
   }

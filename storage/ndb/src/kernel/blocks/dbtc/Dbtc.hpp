@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2003, 2024, Oracle and/or its affiliates.
+   Copyright (c) 2003, 2026, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -1404,6 +1404,16 @@ class Dbtc : public SimulatedBlock {
 
     Uint32 m_location_domain_id;
 
+    /* Discrete states of API failure handling for logs etc */
+    enum ApiFailStates {
+      AF_IDLE,
+      AF_CHECK_TRANS,
+      AF_CHECK_MARKERS,
+      AF_CHECK_MARKERS_WAIT_TC_TAKEOVER,
+      AF_CHECK_MARKERS_WAIT_TRANS
+    };
+    Uint32 m_af_state;
+    /* Independent steps of Data node failure handling */
     enum NodeFailBits {
       NF_TAKEOVER = 0x1,
       NF_CHECK_SCAN = 0x2,
@@ -1411,7 +1421,12 @@ class Dbtc : public SimulatedBlock {
       NF_BLOCK_HANDLE = 0x8,
       NF_NODE_FAIL_BITS = 0xF  // All bits...
     };
-    Uint32 m_nf_bits;
+    enum NF_CHECK_TRANSACTION_PHASES {
+      NF_CT_TIMEOUT_TRANSACTIONS = 0,
+      NF_CT_WAIT_TRANSACTIONS = 1
+    };
+
+    Uint32 m_nf_bits; /* Node fail handling state */
     NdbNodeBitmask _m_lqh_trans_conf;
     /**
      * Indicator if any history to track yet
@@ -2251,12 +2266,12 @@ class Dbtc : public SimulatedBlock {
   // Generated statement blocks
   void warningHandlerLab(Signal *signal, int line);
   [[noreturn]] void systemErrorLab(Signal *signal, int line);
-  void sendSignalErrorRefuseLab(Signal *signal,
-                                ApiConnectRecordPtr apiConnectptr);
+  void handleSignalStateProblem(Signal *signal,
+                                ApiConnectRecordPtr apiConnectptr,
+                                NodeId signalNodeId, Uint32 context);
   void scanTabRefLab(Signal *signal, Uint32 errCode,
                      ApiConnectRecord *regApiPtr);
   void diFcountReqLab(Signal *signal, ScanRecordPtr, ApiConnectRecordPtr);
-  void signalErrorRefuseLab(Signal *signal, ApiConnectRecordPtr apiConnectptr);
   void abort080Lab(Signal *signal);
   void abortScanLab(Signal *signal, ScanRecordPtr, Uint32 errCode,
                     bool not_started, ApiConnectRecordPtr apiConnectptr);
@@ -2329,11 +2344,9 @@ class Dbtc : public SimulatedBlock {
 
   void checkScanActiveInFailedLqh(Signal *signal, Uint32 scanPtrI,
                                   Uint32 failedNodeId);
-  void checkScanFragList(Signal *, Uint32 failedNodeId, ScanRecord *scanP,
-                         Local_ScanFragRec_dllist::Head &);
 
-  void nodeFailCheckTransactions(Signal *, Uint32 transPtrI,
-                                 Uint32 failedNodeId);
+  void nodeFailCheckTransactions(Signal *, Uint32 phase, Uint32 transPtrI,
+                                 Uint32 failedNodeId, Uint32 wait_for_count);
   void ndbdFailBlockCleanupCallback(Signal *signal, Uint32 failedNodeId,
                                     Uint32 ignoredRc);
   void checkNodeFailComplete(Signal *signal, Uint32 failedNodeId, Uint32 bit);
@@ -2659,7 +2672,7 @@ class Dbtc : public SimulatedBlock {
 
   bool validate_filter(Signal *);
   bool match_and_print(Signal *, ApiConnectRecordPtr);
-  bool ndbinfo_write_trans(Ndbinfo::Row &, ApiConnectRecordPtr);
+  bool ndbinfo_write_trans(Ndbinfo::Row &, ApiConnectRecordPtr, bool);
 
 #ifdef ERROR_INSERT
   bool testFragmentDrop(Signal *signal);
@@ -2813,7 +2826,10 @@ class Dbtc : public SimulatedBlock {
   Uint32 c_trans_error_loglevel;
   Uint32 m_take_over_operations;
 
+  bool m_dbinfo_full_apiconnectrecord;
+
   void dump_trans(ApiConnectRecordPtr transPtr);
+  void dump_scan_state(ApiConnectRecordPtr scanTransPtr);
   bool hasOp(ApiConnectRecordPtr transPtr, Uint32 op);
 
  public:

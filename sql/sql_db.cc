@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2000, 2024, Oracle and/or its affiliates.
+   Copyright (c) 2000, 2026, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -125,7 +125,7 @@ static bool find_db_tables(THD *thd, const dd::Schema &schema, const char *db,
 static long mysql_rm_arc_files(THD *thd, MY_DIR *dirp, const char *org_path);
 static bool rm_dir_w_symlink(const char *org_path, bool send_error);
 static void mysql_change_db_impl(THD *thd, const LEX_CSTRING &new_db_name,
-                                 ulong new_db_access,
+                                 Access_bitmask new_db_access,
                                  const CHARSET_INFO *new_db_charset);
 
 bool get_default_db_collation(const dd::Schema &schema,
@@ -872,10 +872,6 @@ bool mysql_rm_db(THD *thd, const LEX_CSTRING &db, bool if_exists) {
   {
     /* Database directory does not exist. */
     if (schema_dirp == nullptr) {
-      if (!if_exists) {
-        my_error(ER_SCHEMA_DIR_MISSING, MYF(0), path);
-        return true;
-      }
       push_warning_printf(thd, Sql_condition::SL_NOTE, ER_SCHEMA_DIR_MISSING,
                           ER_THD(thd, ER_SCHEMA_DIR_MISSING), path);
     } else {
@@ -914,7 +910,8 @@ bool mysql_rm_db(THD *thd, const LEX_CSTRING &db, bool if_exists) {
       Note: We use !opt_initialize because ddl logs are not available when
       the server is started with --initialize.
     */
-    bool log_ddl = !opt_initialize && use_ddl_log_for_schema_ddl();
+    bool log_ddl = !opt_initialize && (schema_dirp != nullptr) &&
+                   use_ddl_log_for_schema_ddl();
     if (tables) {
       error = mysql_rm_table_no_locks(
           thd, tables, true, false, true, db.str, log_ddl, &dropped_non_atomic,
@@ -948,7 +945,7 @@ bool mysql_rm_db(THD *thd, const LEX_CSTRING &db, bool if_exists) {
         other connected server.
       */
 
-      ha_drop_database(path);
+      ha_drop_database(db.str);
       thd->clear_error(); /* @todo Do not ignore errors */
       const Disable_binlog_guard binlog_guard(thd);
       error = Events::drop_schema_events(thd, *schema);
@@ -1332,7 +1329,7 @@ err:
 */
 
 static void mysql_change_db_impl(THD *thd, const LEX_CSTRING &new_db_name,
-                                 ulong new_db_access,
+                                 Access_bitmask new_db_access,
                                  const CHARSET_INFO *new_db_charset) {
   /* 1. Change current database in THD. */
 
@@ -1490,7 +1487,7 @@ bool mysql_change_db(THD *thd, const LEX_CSTRING &new_db_name,
   LEX_CSTRING new_db_file_name_cstr;
 
   Security_context *sctx = thd->security_context();
-  ulong db_access = sctx->current_db_access();
+  Access_bitmask db_access = sctx->current_db_access();
   const CHARSET_INFO *db_default_cl = nullptr;
 
   // We must make sure the schema is released and unlocked in the right order.

@@ -80,7 +80,7 @@ select b,filler from t3 where (b>='c-1011=w' and b<= 'c-1018=w') or
 #
 # Now try different keypart types and special values
 #
-create table t4 (a varchar(10), b int, c char(12), filler char(200),
+create table t4 (a varchar(10), b int, c char(10), filler char(200),
                  key idx1 (a, b, c)) charset utf8mb4;
 
 # insert buffer_size * 1.5 all-NULL tuples
@@ -613,7 +613,9 @@ SET @save_explain_json_format_version = @@explain_json_format_version;
 SELECT @@optimizer_switch LIKE "%mrr=on%";
 
 CREATE TABLE t(x INT, y INT, z INT, KEY(x));
-INSERT INTO t(x) VALUES (1), (2), (3), (4), (5), (6), (7), (8), (9), (10);
+INSERT INTO t(x) WITH RECURSIVE qn(n) AS
+(SELECT 0 UNION ALL SELECT n+1 FROM qn WHERE n<99)
+SELECT n FROM qn;
 ANALYZE TABLE t;
 
 # Should show "Using MRR" in Extra

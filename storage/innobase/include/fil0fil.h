@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1995, 2024, Oracle and/or its affiliates.
+Copyright (c) 1995, 2026, Oracle and/or its affiliates.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License, version 2.0, as published by the
@@ -71,12 +71,14 @@ constexpr size_t FIL_SCAN_MAX_THREADS = 16;
 /** Number of threads per core. */
 constexpr size_t FIL_SCAN_THREADS_PER_CORE = 2;
 
+#ifndef UNIV_HOTBACKUP
 /** Calculate the number of threads that can be spawned to scan the given
 number of files taking into the consideration, number of cores available
 on the machine.
 @param[in]      num_files       Number of files to be scanned
 @return number of threads to be spawned for scanning the files */
 size_t fil_get_scan_threads(size_t num_files);
+#endif /* !UNIV_HOTBACKUP */
 
 /** This tablespace name is used internally during file discovery to open a
 general tablespace before the data dictionary is recovered and available. */
@@ -140,13 +142,16 @@ enum class Fil_state {
   /** Space ID matches but the paths don't match. */
   MOVED,
 
-  /** Space ID and paths match but dd_table data dir flag doesn't
-  exist or tablespace is created outside default data dir */
-  MOVED_PREV_OR_HAS_DATADIR,
+  /** Space ID and paths match but dd_table data dir flag is false despite the
+  file being outside default data dir */
+  MOVED_PREV,
 
   /** Tablespace and/or filename was renamed. The DDL log will handle
   this case. */
-  RENAMED
+  RENAMED,
+
+  /** In case of error during comparison. */
+  COMPARE_ERROR
 };
 
 struct fil_space_t;
@@ -1574,13 +1579,6 @@ for concurrency control.
 @param[in,out]  space   Tablespace to release  */
 void fil_space_release(fil_space_t *space);
 
-/** Fetch the file name opened for a space_id from the file map.
-@param[in]   space_id  tablespace ID
-@param[out]  name      the scanned filename
-@return true if the space_id is found. The name is set to an
-empty string if the space_id is not found. */
-bool fil_system_get_file_by_space_id(space_id_t space_id, std::string &name);
-
 /** Fetch the file name opened for an undo space number from the file map.
 @param[in]   space_num  Undo tablespace Number
 @param[out]  space_id   Undo tablespace ID
@@ -2147,31 +2145,21 @@ void fil_tablespace_open_init_for_recovery(bool recovery);
 @return true if the space ID is known. */
 [[nodiscard]] bool fil_tablespace_lookup_for_recovery(space_id_t space_id);
 
-/** Compare and update space name and dd path for partitioned table. Uniformly
-converts partition separators and names to lower case.
-@param[in]      space_id        tablespace ID
-@param[in]      fsp_flags       tablespace flags
-@param[in]      update_space    update space name
-@param[in,out]  space_name      tablespace name
-@param[in,out]  dd_path         file name with complete path
-@return true, if names are updated. */
-bool fil_update_partition_name(space_id_t space_id, uint32_t fsp_flags,
-                               bool update_space, std::string &space_name,
-                               std::string &dd_path);
-
 /** Add tablespace to the set of tablespaces to be updated in DD.
-@param[in]    dd_object_id                   Server DD tablespace ID
-@param[in]    space_id                       InnoDB tablespace ID
-@param[in]    space_name                     Tablespace name
-@param[in]    old_path                       Old Path in the data dictionary
-@param[in]    new_path                       New path to be update in dictionary
-@param[in]    moved_prev_or_has_datadir      The move has happened before
-                                             8.0.38/8.4.1/9.0.0 or table is
-                                             created with data dir clause.*/
+@param[in]      dd_object_id    Server DD tablespace ID
+@param[in]      space_id        Innodb tablespace ID
+@param[in]      space_name      New tablespace name
+@param[in]      old_path        Old Path in the data dictionary
+@param[in]      new_path        New path to be update in dictionary
+@param[in]      dd_flag_missing This tablespace is outside default data
+                                directory, yet it is missing
+                                DD_TABLE_DATA_DIRECTORY flag. This could
+                                happen in versions earlier than
+                                8.0.38/8.4.1/9.0.0 */
 void fil_add_moved_space(dd::Object_id dd_object_id, space_id_t space_id,
                          const char *space_name, const std::string &old_path,
-                         const std::string &new_path,
-                         bool moved_prev_or_has_datadir);
+                         const std::string &new_path, bool dd_flag_missing);
+
 /** Lookup the tablespace ID and return the path to the file. The filename
 is ignored when testing for equality. Only the path up to the file name is
 considered for matching: e.g. ./test/a.ibd == ./test/b.ibd.
@@ -2215,14 +2203,14 @@ already be known.
 [[nodiscard]] dberr_t fil_tablespace_open_for_recovery(space_id_t space_id);
 
 /** Replay a file rename operation for ddl replay.
-@param[in]      page_id         Space ID and first page number in the file
+@param[in]      space_id        Space ID
 @param[in]      old_name        old file name
 @param[in]      new_name        new file name
 @return whether the operation was successfully applied
 (the name did not exist, or new_name did not exist and
 name was successfully renamed to new_name)  */
-bool fil_op_replay_rename_for_ddl(const page_id_t &page_id,
-                                  const char *old_name, const char *new_name);
+bool fil_op_replay_rename_for_ddl(space_id_t space_id, const char *old_name,
+                                  const char *new_name);
 
 /** Free the Tablespace_files instance.
 @param[in]      read_only_mode  true if InnoDB is started in read only mode.

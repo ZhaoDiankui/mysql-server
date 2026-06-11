@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2013, 2024, Oracle and/or its affiliates.
+   Copyright (c) 2013, 2026, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -544,12 +544,20 @@ bool Table_trigger_dispatcher::process_triggers(
     m_new_field = m_record1_field;
     m_old_field = m_subject_table->field;
   }
+
   /*
-    This trigger must have been processed by the pre-locking
-    algorithm.
+    This trigger must have been processed by the pre-locking algorithm.
+    Note:
+    While validating FK constraints, another `TABLE` instance may be created
+    for a prelocked table. For example, executing cascade operations on a
+    self-referencing foreign key can open an additional handle. Such tables
+    are not added to the prelocked table list, so skip the following check in
+    this special case.
   */
-  assert(m_subject_table->pos_in_table_list->trg_event_map &
-         static_cast<uint>(1 << static_cast<int>(event)));
+  assert((m_subject_table->pos_in_table_list == nullptr &&
+          m_subject_table->open_for_fk_name != nullptr) ||
+         m_subject_table->pos_in_table_list->trg_event_map &
+             static_cast<uint>(1 << static_cast<int>(event)));
 
   const bool rc = tc->execute_triggers(thd);
 
@@ -630,6 +638,16 @@ void Table_trigger_dispatcher::disable_fields_temporary_nullability() {
 
   for (Field **next_field = m_subject_table->field; *next_field; ++next_field)
     (*next_field)->reset_tmp_nullable();
+}
+
+/**
+  Reset the temporary null values set to the field for triggers.
+ */
+void Table_trigger_dispatcher::reset_field_nulls() {
+  assert(m_subject_table);
+
+  for (Field **next_field = m_subject_table->field; *next_field; ++next_field)
+    (*next_field)->reset_tmp_null();
 }
 
 /**

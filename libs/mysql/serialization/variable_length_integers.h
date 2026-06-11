@@ -1,4 +1,4 @@
-// Copyright (c) 2023, 2024, Oracle and/or its affiliates.
+// Copyright (c) 2023, 2026, Oracle and/or its affiliates.
 //
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License, version 2.0,
@@ -36,6 +36,7 @@
 #include <concepts>
 #include <limits>
 #include "my_byteorder.h"
+#include "mysql/serialization/byte_order_helpers.h"  // htole64
 
 /// @addtogroup GroupLibsMysqlSerialization
 /// @{
@@ -43,7 +44,6 @@
 namespace mysql::serialization::detail {
 
 /// @brief Calculates the number of bytes necessary to store data
-/// @tparam Type Integer type
 /// @param data The number to be stored into the memory
 /// @return The number of bytes necessary to store data.
 size_t get_size_integer_varlen_unsigned(

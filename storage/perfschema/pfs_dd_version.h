@@ -1,4 +1,4 @@
-/* Copyright (c) 2017, 2024, Oracle and/or its affiliates.
+/* Copyright (c) 2017, 2026, Oracle and/or its affiliates.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License, version 2.0,
@@ -265,6 +265,11 @@
      SYS.INNODB_LOCK_WAITS IN MYSQL 8.0
      - Table performance_schema.data_lock_waits, add PRIMARY KEY.
 
+  80409:
+
+   - WL#15201 PERFORMANCE_SCHEMA, OTEL INTERFACE: LOG
+     - New table performance_schema.setup_logger.
+
   90000:
 
    - WL#15855: System variable metadata
@@ -276,8 +281,15 @@
    - Bug#31763497 PERFORMANCE DEGRADATION CAUSED BY MONITORING
      SYS.INNODB_LOCK_WAITS IN MYSQL 8.0
      - Table performance_schema.data_lock_waits, add PRIMARY KEY.
+
+  90600:
+
+   - WL#16803: Query Temporary Account Locking Status
+     - New table temporary_account_locks.
+     - New column host_cache.COUNT_ACCOUNT_LOCKED_ERRORS.
+     - New column host_cache.COUNT_TEMPORARY_ACCOUNT_LOCKED_ERRORS.
 */
 
-static const uint PFS_DD_VERSION = 90100;
+static const uint PFS_DD_VERSION = 90600;
 
 #endif /* PFS_DD_VERSION_H */

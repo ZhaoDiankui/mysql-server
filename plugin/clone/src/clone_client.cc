@@ -1,4 +1,4 @@
-/* Copyright (c) 2017, 2024, Oracle and/or its affiliates.
+/* Copyright (c) 2017, 2026, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -26,7 +26,7 @@
 Clone Plugin: Client implementation
 
 */
-#include <inttypes.h>
+#include <cinttypes>
 
 #include "plugin/clone/include/clone_client.h"
 #include "plugin/clone/include/clone_os.h"
@@ -106,7 +106,7 @@ void Thread_Info::throttle(uint64_t data_target, uint64_t net_target) {
       we sleep more frequently. */
       m_interval = m_interval / 2;
     }
-    Time_Msec sleep_time(sleep_ms);
+    Time_Msec const sleep_time(sleep_ms);
     std::this_thread::sleep_for(sleep_time);
   } else {
     /* Reset interval back to default 100ms. */
@@ -148,7 +148,7 @@ void Client_Stat::update(bool reset, const Thread_Vector &threads,
 
   /* Evaluate total data and network bytes transferred till now. */
   for (uint32_t index = 0; index <= num_workers; ++index) {
-    auto &thread_info = threads[index];
+    const auto &thread_info = threads[index];
     data_bytes += thread_info.m_data_bytes;
     net_bytes += thread_info.m_network_bytes;
   }
@@ -466,6 +466,7 @@ Client::Client(THD *thd, Client_Share *share, uint32_t index, bool is_master)
   m_conn_aux.reset();
 
   net_server_ext_init(&m_conn_server_extn);
+  m_parameters.m_json_configs.SetObject();
 }
 
 Client::~Client() {
@@ -530,7 +531,7 @@ uchar *Client::get_aligned_buffer(uint32_t len) {
   }
 
   /* Align buffer to CLONE_OS_ALIGN[4K] for O_DIRECT */
-  auto buf_ptr = clone_os_align(m_copy_buff.m_buffer);
+  auto *buf_ptr = clone_os_align(m_copy_buff.m_buffer);
 
   return (buf_ptr);
 }
@@ -938,7 +939,7 @@ int Client::connect_remote(bool is_restart, bool use_aux) {
       err = remote_command(COM_EXIT, false);
       log_error(get_thd(), true, err, "Source Task COM_EXIT");
 
-      bool abort_net = (err != 0);
+      bool const abort_net = (err != 0);
       mysql_service_clone_protocol->mysql_clone_disconnect(get_thd(), m_conn,
                                                            abort_net, false);
       snprintf(info_mesg, 128, "Source Task Disconnect: abort: %s",
@@ -1019,7 +1020,7 @@ bool Client::plugin_is_loadable(std::string &so_name) {
 
 bool Client::plugin_is_installed(std::string &plugin_name) {
   /* Attempt to lock plugin by name. */
-  auto plugin = my_plugin_lock_by_name(
+  auto *plugin = my_plugin_lock_by_name(
       get_thd(), to_lex_cstring(plugin_name.c_str()), MYSQL_ANY_PLUGIN);
 
   if (plugin) {
@@ -1027,6 +1028,85 @@ bool Client::plugin_is_installed(std::string &plugin_name) {
     return true;
   }
   return false;
+}
+
+/** Test specific function to configure the version strings of the donor and
+recipient to cover various scenarios where clone is allowed or not. This
+function will modify the input to ensure correct error message is printed.
+@param config_val recipient server's version string
+@param donor_val  donor server's version string
+*/
+static void test_configure_versions([[maybe_unused]] std::string &config_val,
+                                    [[maybe_unused]] std::string &donor_val) {
+  /* Test specific code to check for cross version clone support */
+  DBUG_EXECUTE_IF("clone_across_lts_version_match",
+                  { config_val = donor_val; });
+  DBUG_EXECUTE_IF("clone_across_lts_major_mismatch", {
+    config_val = "8.4.0";
+    donor_val = "9.7.2";
+  });
+  DBUG_EXECUTE_IF("clone_across_lts_minor_mismatch", {
+    config_val = "8.4.0";
+    donor_val = "8.3.2";
+  });
+  DBUG_EXECUTE_IF("clone_across_lts_non_8_0_patch_mismatch", {
+    config_val = "8.4.2";
+    donor_val = "8.4.1";
+  });
+  DBUG_EXECUTE_IF("clone_across_lts_8_0_patch_match", {
+    config_val = "8.0.25";
+    donor_val = "8.0.25-debug";
+  });
+  DBUG_EXECUTE_IF("clone_across_lts_8_0_before_backport_patch_mismatch", {
+    config_val = "8.0.34";
+    donor_val = "8.0.35";
+  });
+  DBUG_EXECUTE_IF("clone_across_lts_8_0_before_backport_patch_mis_single", {
+    config_val = "8.0.6";
+    donor_val = "8.0.7";
+  });
+  DBUG_EXECUTE_IF("clone_across_lts_8_0_across_backport_patch_mismatch", {
+    config_val = "8.0.38";
+    donor_val = "8.0.35";
+  });
+  DBUG_EXECUTE_IF("clone_across_lts_8_0_after_backport_patch_mismatch", {
+    config_val = "8.0.38";
+    donor_val = "8.0.37";
+  });
+  DBUG_EXECUTE_IF("clone_one_lts_to_next_lts", {
+    config_val = "10.7.0";
+    donor_val = "9.7.0";
+  });
+}
+
+static int validate_json_configs(rapidjson::Document &recipient,
+                                 rapidjson::Document &donor) {
+  assert(donor.IsObject());
+  assert(!donor.ObjectEmpty());
+
+  assert(recipient.IsObject());
+  assert(!recipient.ObjectEmpty());
+
+  std::string donor_version = donor["version"].GetString();
+  std::string recipient_version = recipient["version"].GetString();
+  test_configure_versions(recipient_version, donor_version);
+
+  bool is_recipient_lts = false;
+  bool is_donor_lts = false;
+
+  if (recipient.HasMember("maturity")) {
+    const std::string recipient_maturity = recipient["maturity"].GetString();
+    is_recipient_lts = (recipient_maturity.compare("LTS") == 0);
+    DBUG_EXECUTE_IF("clone_one_lts_to_next_lts", { is_recipient_lts = true; });
+  }
+  if (donor.HasMember("maturity")) {
+    const std::string donor_maturity = donor["maturity"].GetString();
+    is_donor_lts = (donor_maturity.compare("LTS") == 0);
+    DBUG_EXECUTE_IF("clone_one_lts_to_next_lts", { is_donor_lts = true; });
+  }
+
+  return mysql_service_clone_protocol->mysql_clone_validate_version(
+      recipient_version, donor_version, is_recipient_lts, is_donor_lts);
 }
 
 int Client::validate_remote_params() {
@@ -1080,6 +1160,32 @@ int Client::validate_remote_params() {
   if (err != 0) {
     last_error = err;
   }
+
+  if (m_share->m_protocol_version == CLONE_PROTOCOL_VERSION_V3) {
+    insert_key_value(m_parameters.m_configs, m_parameters.m_json_configs);
+  }
+
+  Key_Values configs = {{"version", ""}};
+
+  err =
+      mysql_service_clone_protocol->mysql_clone_get_configs(get_thd(), configs);
+  if (err != 0) {
+    return err;
+  }
+
+  if (m_share->m_protocol_version == CLONE_PROTOCOL_VERSION_V4) {
+    configs.push_back({"maturity", MYSQL_VERSION_MATURITY});
+  }
+
+  rapidjson::Document recipient_configs;
+  recipient_configs.SetObject();
+
+  insert_key_value(configs, recipient_configs);
+
+  err = validate_json_configs(recipient_configs, m_parameters.m_json_configs);
+  if (err != 0) {
+    last_error = err;
+  }
   return (last_error);
 }
 
@@ -1095,7 +1201,7 @@ int Client::extract_string(const uchar *&packet, size_t &length,
     if (length >= name_length) {
       str.clear();
       if (name_length > 0) {
-        auto char_str = reinterpret_cast<const char *>(packet);
+        const auto *char_str = reinterpret_cast<const char *>(packet);
         auto str_len = static_cast<size_t>(name_length);
         str.assign(char_str, str_len);
 
@@ -1172,13 +1278,29 @@ void Client::use_other_configs() {
     auto res = config_name.compare("clone_donor_timeout_after_network_failure");
     if (res == 0) {
       try {
-        int timeout_minutes = std::stoi(key_val.second);
+        int const timeout_minutes = std::stoi(key_val.second);
         s_reconnect_timeout = Time_Min(timeout_minutes);
       } catch (...) {
         assert(false);
       }
     }
   }
+}
+
+int Client::add_json_configs(const uchar *packet, size_t length) {
+  Key_Value json_config;
+  auto err = extract_key_value(packet, length, json_config);
+
+  if (err != 0) {
+    return err;
+  }
+
+  if (!parse_json_object(json_config.second.c_str(),
+                         m_parameters.m_json_configs)) {
+    err = ER_CLONE_PROTOCOL;
+    my_error(err, MYF(0), "Failed to parse JSON configuration");
+  }
+  return err;
 }
 
 int Client::add_config(const uchar *packet, size_t length, bool other) {
@@ -1212,7 +1334,7 @@ int Client::remote_command(Command_RPC com, bool use_aux) {
   assert(cmd_buff_len <= m_cmd_buff.m_length);
 
   /* Use auxiliary connection for ACK */
-  auto conn = use_aux ? m_conn_aux.m_conn : m_conn;
+  auto *conn = use_aux ? m_conn_aux.m_conn : m_conn;
 
   assert(conn != nullptr);
 
@@ -1301,7 +1423,7 @@ int Client::serialize_ack_cmd(size_t &buf_len) {
   buf_len = 4;
 
   /* Add locator */
-  auto loc = &m_share->m_storage_vec[m_conn_aux.m_cur_index];
+  auto *loc = &m_share->m_storage_vec[m_conn_aux.m_cur_index];
   buf_len += loc->serlialized_length();
 
   /* Add descriptor */
@@ -1310,7 +1432,7 @@ int Client::serialize_ack_cmd(size_t &buf_len) {
 
   /* Allocate for command buffer */
   auto err = m_cmd_buff.allocate(buf_len);
-  auto buf_ptr = m_cmd_buff.m_buffer;
+  auto *buf_ptr = m_cmd_buff.m_buffer;
 
   if (err != 0) {
     return (err);
@@ -1336,6 +1458,8 @@ int Client::serialize_ack_cmd(size_t &buf_len) {
 }
 
 int Client::serialize_init_cmd(size_t &buf_len) {
+  DBUG_EXECUTE_IF("clone_set_to_protocol_version_3",
+                  { m_share->m_protocol_version = CLONE_PROTOCOL_VERSION_V3; });
   /* Add length of protocol Version */
   buf_len = sizeof(m_share->m_protocol_version);
 
@@ -1349,7 +1473,7 @@ int Client::serialize_init_cmd(size_t &buf_len) {
 
   /* Allocate for command buffer */
   auto err = m_cmd_buff.allocate(buf_len);
-  auto buf_ptr = m_cmd_buff.m_buffer;
+  auto *buf_ptr = m_cmd_buff.m_buffer;
 
   if (err != 0) {
     return (err);
@@ -1403,7 +1527,7 @@ int Client::receive_response(Command_RPC com, bool use_aux) {
     uchar *packet;
     size_t length, network_length;
 
-    auto conn = use_aux ? m_conn_aux.m_conn : m_conn;
+    auto *conn = use_aux ? m_conn_aux.m_conn : m_conn;
 
     /* Set current socket as active for clone data connection. */
     err = mysql_service_clone_protocol->mysql_clone_get_response(
@@ -1507,6 +1631,10 @@ int Client::handle_response(const uchar *packet, size_t length, int in_err,
 
     case COM_RES_CONFIG_V3:
       err = add_config(packet, length, true);
+      break;
+
+    case COM_RES_CONFIG_V4:
+      err = add_json_configs(packet, length);
       break;
 
     case COM_RES_COLLATION:
@@ -1674,8 +1802,8 @@ int Client::set_descriptor(const uchar *buffer, size_t length) {
   ++buffer;
   length--;
 
-  auto loc = &m_share->m_storage_vec[loc_index];
-  auto hton = loc->m_hton;
+  auto *loc = &m_share->m_storage_vec[loc_index];
+  auto *hton = loc->m_hton;
 
   if (hton->db_type != db_type) {
     err = ER_CLONE_PROTOCOL;
@@ -1704,7 +1832,7 @@ int Client::set_descriptor(const uchar *buffer, size_t length) {
   auxiliary connection. Only master client task should use it. */
   assert(is_master());
 
-  auto aux_conn = get_aux();
+  auto *aux_conn = get_aux();
 
   aux_conn->reset();
   aux_conn->m_error = err;
@@ -1752,12 +1880,12 @@ int Client::wait(Time_Sec wait_time) {
   sec -= std::chrono::duration_cast<Time_Sec>(min);
   log_strm << "Wait time remaining is " << min.count() << " minutes and "
            << sec.count() << " seconds.";
-  std::string log_str(log_strm.str());
+  std::string const log_str(log_strm.str());
   LogPluginErr(INFORMATION_LEVEL, ER_CLONE_CLIENT_TRACE, log_str.c_str());
   log_strm.str("");
 
   for (;;) {
-    Time_Msec sleep_time(100);
+    Time_Msec const sleep_time(100);
     std::this_thread::sleep_for(sleep_time);
     auto cur_time = Clock::now();
 
@@ -1777,7 +1905,7 @@ int Client::wait(Time_Sec wait_time) {
       auto remaining_time = wait_time - duration_sec;
       min = std::chrono::duration_cast<Time_Min>(remaining_time);
       log_strm << "Wait time remaining is " << min.count() << " minutes.";
-      std::string log_str(log_strm.str());
+      std::string const log_str(log_strm.str());
       LogPluginErr(INFORMATION_LEVEL, ER_CLONE_CLIENT_TRACE, log_str.c_str());
       log_strm.str("");
     }
@@ -1817,7 +1945,7 @@ int Client_Cbk::file_cbk(Ha_clone_file from_file [[maybe_unused]],
 }
 
 int Client_Cbk::buffer_cbk(uchar *from_buffer [[maybe_unused]], uint buf_len) {
-  auto client = get_clone_client();
+  auto *client = get_clone_client();
 
   uint64_t data_estimate = 0;
   if (is_state_change(data_estimate)) {
@@ -1835,7 +1963,7 @@ int Client_Cbk::buffer_cbk(uchar *from_buffer [[maybe_unused]], uint buf_len) {
     return (ER_QUERY_INTERRUPTED);
   }
 
-  auto aux_conn = client->get_aux();
+  auto *aux_conn = client->get_aux();
 
   aux_conn->reset();
   aux_conn->m_buffer = get_data_desc(&buf_len);
@@ -1867,7 +1995,7 @@ int Client_Cbk::apply_file_cbk(Ha_clone_file to_file) {
 
 int Client_Cbk::apply_cbk(Ha_clone_file to_file, bool apply_file,
                           uchar *&to_buffer, uint &to_len) {
-  auto client = get_clone_client();
+  auto *client = get_clone_client();
   auto &info = client->get_thread_info();
 
   MYSQL *conn;
@@ -1908,7 +2036,7 @@ int Client_Cbk::apply_cbk(Ha_clone_file to_file, bool apply_file,
   packet++;
   length--;
 
-  auto buf_ptr = packet;
+  auto *buf_ptr = packet;
 
   if (!is_os_buffer_cache()) {
     /* Allocate aligned buffer */

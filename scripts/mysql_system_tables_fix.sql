@@ -1,4 +1,4 @@
--- Copyright (c) 2003, 2024, Oracle and/or its affiliates.
+-- Copyright (c) 2003, 2026, Oracle and/or its affiliates.
 --
 -- This program is free software; you can redistribute it and/or modify
 -- it under the terms of the GNU General Public License, version 2.0,
@@ -1603,6 +1603,12 @@ INSERT INTO global_grants SELECT user, host, 'OPTIMIZE_LOCAL_TABLE',
 IF (WITH_GRANT_OPTION = 'Y', 'Y', 'N') FROM global_grants WHERE priv = 'SYSTEM_USER' AND @hadOptimizeLocalTable = 0;
 COMMIT;
 
+-- Add the privilege MANAGE_DATA_MASKING_POLICY for every user who has CREATE or DROP privilege
+SET @hadManageDataMaskingPolicy = (SELECT COUNT(*) FROM global_grants WHERE priv = 'MANAGE_DATA_MASKING_POLICY');
+INSERT INTO global_grants SELECT user, host, 'MANAGE_DATA_MASKING_POLICY',
+IF (grant_priv = 'Y', 'Y', 'N') FROM mysql.user WHERE (Create_priv = 'Y' OR Drop_priv = 'Y') AND @hadManageDataMaskingPolicy = 0;
+COMMIT;
+
 SET @@session.sql_mode = @old_sql_mode;
 
 ALTER TABLE gtid_executed
@@ -1616,12 +1622,21 @@ INSERT INTO global_grants SELECT user, host, 'TRANSACTION_GTID_TAG',
 IF (WITH_GRANT_OPTION = 'Y', 'Y', 'N') FROM global_grants WHERE priv = 'BINLOG_ADMIN' AND @hadTransactionGtidTagPriv = 0;
 COMMIT;
 
--- Add the privilege FLUSH_PRIVILEGES for every user who has the
--- privilege RELOAD, provided that there is not a user who already has
--- privilege FLUSH_PRIVILEGES
-SET @hadFlushPrivilegesPriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'FLUSH_PRIVILEGES');
-INSERT INTO global_grants SELECT user, host, 'FLUSH_PRIVILEGES', IF(grant_priv = 'Y', 'Y', 'N')
-FROM mysql.user WHERE Reload_priv = 'Y' AND @hadFlushPrivilegesPriv = 0;
-
 -- SET_USER_ID is removed dynamic privilege, revoke all grants of it.
 DELETE FROM global_grants WHERE PRIV = 'SET_USER_ID';
+
+-- Add the privilege CREATE_SPATIAL_REFERENCE_SYSTEM for every user who has the privilege SUPER
+-- provided that there isn't a user who already has the privilege CREATE_SPATIAL_REFERENCE_SYSTEM.
+SET @hadCreateSpatialRefrenceSystem =
+  (SELECT COUNT(*) FROM global_grants WHERE priv = 'CREATE_SPATIAL_REFERENCE_SYSTEM');
+INSERT INTO global_grants SELECT user, host, 'CREATE_SPATIAL_REFERENCE_SYSTEM', IF(grant_priv = 'Y', 'Y', 'N')
+FROM mysql.user WHERE super_priv = 'Y' AND @hadCreateSpatialRefrenceSystem = 0 AND user NOT IN ('mysql.infoschema','mysql.session','mysql.sys');
+
+-- Bug#36808636 System accounts are not converted to non legacy auth plugin during upgrade
+-- Convert authentication of 'mysql.sys' and 'mysql.sessioon' users
+-- from mysql_native_password into caching_sha2_password.
+UPDATE mysql.user SET plugin='caching_sha2_password', authentication_string='$A$005$THISISACOMBINATIONOFINVALIDSALTANDPASSWORDTHATMUSTNEVERBRBEUSED' WHERE user='mysql.sys';
+UPDATE mysql.user SET plugin='caching_sha2_password', authentication_string='$A$005$THISISACOMBINATIONOFINVALIDSALTANDPASSWORDTHATMUSTNEVERBRBEUSED' WHERE user='mysql.session';
+
+ALTER TABLE procs_priv
+  MODIFY Routine_type enum('FUNCTION','PROCEDURE','LIBRARY') NOT NULL;

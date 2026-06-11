@@ -147,6 +147,7 @@ SELECT title, MATCH(title, text) AGAINST ('database') AS score
 FROM wp
 ORDER BY score DESC LIMIT 3;
 
+--skip_if_hypergraph  # Different handler calls. Plan chosen is different.
 SHOW SESSION STATUS LIKE 'Handler_read%';
 SHOW SESSION STATUS LIKE 'Sort_rows%';
 
@@ -538,7 +539,7 @@ SHOW SESSION STATUS LIKE 'Sort%';
 FLUSH STATUS;
 --sorted_result
 SELECT FTS_DOC_ID docid, MATCH(title, text) AGAINST ('database') AS score 
-FROM wp 
+FROM wp FORCE INDEX (idx)
 WHERE MATCH(title, text) AGAINST ('database');
 SHOW SESSION STATUS LIKE 'Handler_read%';
 
@@ -553,7 +554,7 @@ SHOW SESSION STATUS LIKE 'Sort%';
 # Check the count optimization
 let $query = 
 SELECT COUNT(*) 
-FROM wp 
+FROM wp FORCE INDEX (idx)
 WHERE MATCH(title,text) AGAINST ('database' IN NATURAL LANGUAGE MODE);
 eval EXPLAIN $query;
 FLUSH STATUS;
@@ -1029,8 +1030,10 @@ DROP TABLE t1;
 CREATE TABLE t1(f1 CHAR(1) CHARSET latin1, FULLTEXT(f1)) ENGINE=INNODB;
 EXPLAIN SELECT 1 FROM t1 WHERE 1.238585e+308 <= MATCH(f1) AGAINST ('1' IN BOOLEAN MODE);
 
+SET explain_json_format_version = 1;
 --skip_if_hypergraph  # Depends on query plan.
 EXPLAIN FORMAT = JSON SELECT 1 FROM t1 WHERE 1.238585e+308 <= MATCH(f1) AGAINST ('1' IN BOOLEAN MODE);
+SET explain_json_format_version = DEFAULT;
 
 DROP TABLE t1;
 

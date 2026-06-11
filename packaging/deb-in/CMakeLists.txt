@@ -1,4 +1,4 @@
-# Copyright (c) 2016, 2024, Oracle and/or its affiliates.
+# Copyright (c) 2016, 2026, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0,
@@ -99,11 +99,17 @@ IF (DEB_PRODUCT STREQUAL "commercial")
   SET (DEB_NOTPRODUCTNAME "${DEB_BASE_PRODUCT}community")
   SET (DEB_LICENSENAME "Commercial")
   SET (DEB_SERVERVERSION "${DEB_BASE_VERSION}+commercial-1")
+# Commercial only client
+  SET (DEB_INSTALL_CLIENT_EXTRA
+"
+usr/bin/mysqldm
+")
   # List of plugins that are only in commercial packages
   # Plugins that are in both community and commercial should NOT be added here
   SET (DEB_INSTALL_SERVER_PLUGINS
 "
 usr/lib/mysql/plugin/audit_log.so
+usr/lib/mysql/plugin/component_audit_log.so
 usr/lib/mysql/plugin/authentication_kerberos.so
 usr/lib/mysql/plugin/authentication_openid_connect.so
 usr/lib/mysql/plugin/authentication_ldap_sasl.so
@@ -112,6 +118,8 @@ usr/lib/mysql/plugin/authentication_pam.so
 usr/lib/mysql/plugin/authentication_webauthn.so
 usr/lib/mysql/plugin/component_enterprise_encryption.so
 usr/lib/mysql/plugin/component_keyring_encrypted_file.so
+usr/lib/mysql/plugin/component_keyring_hashicorp.so
+usr/lib/mysql/plugin/component_keyring_kmip.so
 usr/lib/mysql/plugin/component_keyring_oci.so
 usr/lib/mysql/plugin/data_masking.so
 usr/lib/mysql/plugin/firewall.so
@@ -126,11 +134,10 @@ usr/lib/mysql/plugin/component_masking.so
 usr/lib/mysql/plugin/component_masking_functions.so
 usr/lib/mysql/plugin/component_mle.so
 usr/lib/mysql/plugin/component_scheduler.so
-usr/lib/mysql/plugin/component_telemetry.so
 usr/lib/mysql/plugin/component_option_tracker.so
-usr/lib/mysql/plugin/component_group_replication_flow_control_stats.so
-usr/lib/mysql/plugin/component_replication_applier_metrics.so
+usr/lib/mysql/plugin/component_firewall.so
 usr/lib/mysql/private/libpolyglot.so
+usr/lib/mysql/plugin/component_object_policy.so
 ")
 
    SET (DEB_INSTALL_TEST_PLUGINS
@@ -142,7 +149,6 @@ usr/bin/mysql_test_jwt_generator
 
   SET (DEB_INSTALL_CLIENT_PLUGINS
 "
-usr/lib/mysql/plugin/telemetry_client.so
 ")
 
   IF (DEB_AWS_SDK)
@@ -282,7 +288,7 @@ ENDIF()
 # Enable various apparmor systems for Ubuntu
 IF(DEB_ID STREQUAL "ubuntu")
   SET (DEB_CONTROL_BDEPS ", dh-apparmor")
-  SET (DEB_RULES_INSTALL_APPARMOR "install -g root -o root -m 0644 -D debian/extra/apparmor-profile debian/tmp/etc/apparmor.d/usr.sbin.mysqld")
+  SET (DEB_RULES_INSTALL_APPARMOR "install -m 0644 -D debian/extra/apparmor-profile debian/tmp/etc/apparmor.d/usr.sbin.mysqld")
   SET (DEB_RULES_APPARMOR_LOAD "dh_apparmor -pmysql-${DEB_PRODUCTNAME}-server --profile-name=usr.sbin.mysqld")
   SET (DEB_INSTALL_SERVER_APPARMOR "etc/apparmor.d/usr.sbin.mysqld")
   SET (DEB_INSTALL_ROUTER_APPARMOR "etc/apparmor.d/usr.bin.mysqlrouter")

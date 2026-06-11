@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2003, 2024, Oracle and/or its affiliates.
+   Copyright (c) 2003, 2026, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -26,15 +26,17 @@
 #include <ndb_global.h>
 #include "util/require.h"
 
-#include <time.h>
+#include <ctime>
 
 #include <ndb_opts.h>
 
 #include <portlib/NdbEnv.h>
+#include <portlib/NdbTimestamp.h>
 #include <NdbIndexStat.hpp>
 #include <logger/Logger.hpp>
 #include "NDBT.hpp"
 #include "NDBT_Test.hpp"
+#include "util/ndb_barrier.h"
 
 #ifdef _WIN32
 #define setenv(a, b, c) _putenv_s(a, b)
@@ -228,6 +230,8 @@ bool NDBT_Context::setDbProperty(const char *, Uint32) {
   abort();
   return true;
 }
+
+ndb::barrier *NDBT_Context::getStepsBarrierPtr() { return steps_barrier.get(); }
 
 void NDBT_Context::setTab(const NdbDictionary::Table *ptab) {
   tables.clear();
@@ -703,8 +707,10 @@ int NDBT_TestCaseImpl1::runSteps(NDBT_Context *ctx) {
   numStepsFail = 0;
   numStepsCompleted = 0;
   unsigned i;
+  ctx->steps_barrier.reset(new ndb::barrier(steps.size()));
   for (i = 0; i < steps.size(); i++) startStepInThread(i, ctx);
   waitSteps();
+  ctx->steps_barrier.release();
 
   // Check if any step failed
   for (i = 0; i < steps.size(); i++) {
@@ -1635,11 +1641,10 @@ void NDBT_TestSuite::printCases() {
 
 const char *NDBT_TestSuite::getDate(char *str, size_t len) {
   // Get current time
-  time_t now;
-  time(&now);
+  std::timespec now = NdbTimestamp_GetCurrentTime();
 
   // Print as timestamp to buf
-  Logger::format_timestamp(now, str, len);
+  Logger::format_timestamp(&now, str, len);
 
   return str;
 }

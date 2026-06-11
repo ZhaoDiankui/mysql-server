@@ -1,4 +1,4 @@
-# Copyright (c) 2017, 2024, Oracle and/or its affiliates.
+# Copyright (c) 2017, 2026, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0,
@@ -59,11 +59,14 @@ FOREACH(test_file
     test_config_overwrites.cc
     test_connection_pool.cc
     test_gr_notifications.cc
+    test_host_cache.cc
+    test_host_cache_config.cc
     test_http_server.cc
     test_logging.cc
     test_logging_eventlog.cc
     test_master_key_reader_writer.cc
     test_metadata_ttl.cc
+    test_mrs_config.cc
     test_cluster_metadata.cc
     test_node_attributes.cc
     test_gr_state.cc
@@ -94,11 +97,17 @@ FOREACH(test_file
     test_socket_close.cc
     test_stacktrace.cc
     test_destination_status.cc
+    test_routing_guidelines_invalid_document.cc
+    test_routing_guidelines_invalid_match.cc
+    test_routing_guidelines_routing.cc
+    test_routing_guidelines_adapter.cc
     )
 add_test_file(${CMAKE_CURRENT_SOURCE_DIR}/${test_file}
   MODULE "component"
   INCLUDE_DIRS
     ${PROJECT_SOURCE_DIR}/src/mock_server/include/mysqlrouter/
+    ${PROJECT_SOURCE_DIR}/src/host_cache/include/
+    ${PROJECT_SOURCE_DIR}/tests/
   SYSTEM_INCLUDE_DIRS ${GMOCK_INCLUDE_DIRS}
                       ${PROTOBUF_INCLUDE_DIR}
   LIB_DEPENDS
@@ -130,6 +139,9 @@ add_test_file(${CMAKE_CURRENT_SOURCE_DIR}/${test_file}
   )
   ROUTERTEST_GET_TARGET(ttt ${test_file} "component")
   DOWNGRADE_STRINGOP_WARNINGS(${ttt})
+  IF(MY_COMPILER_IS_GNU AND (WITH_LTO OR CMAKE_COMPILER_FLAG_WITH_LTO))
+    TARGET_LINK_OPTIONS(${ttt} PRIVATE -Wno-error=stringop-overflow)
+  ENDIF()
 ENDFOREACH()
 
 FOREACH(test_file

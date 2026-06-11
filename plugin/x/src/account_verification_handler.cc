@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, 2024, Oracle and/or its affiliates.
+ * Copyright (c) 2017, 2026, Oracle and/or its affiliates.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License, version 2.0,
@@ -141,6 +141,12 @@ Account_verification_handler::get_account_verificator_id(
   return iface::Account_verification::Account_type::k_unsupported;
 }
 
+bool Account_verification_handler::is_caching_sha2_password(
+    const std::string &plugin_name) const {
+  return get_account_verificator_id(plugin_name) ==
+         iface::Account_verification::Account_type::k_sha2;
+}
+
 ngs::Error_code Account_verification_handler::verify_account(
     const std::string &user, const std::string &host, const std::string &passwd,
     const iface::Authentication_info *authenication_info) const {
@@ -149,6 +155,8 @@ ngs::Error_code Account_verification_handler::verify_account(
     return error;
 
   iface::Account_verification::Account_type account_verificator_id;
+  const bool is_cache_sha2 = is_caching_sha2_password(record.auth_plugin_name);
+  bool is_password_compilant{true};
   // If SHA256_MEMORY is used then no matter what auth_plugin is used we
   // will be using cache-based verification
   if (m_account_type ==
@@ -161,9 +169,16 @@ ngs::Error_code Account_verification_handler::verify_account(
   }
   auto *p = get_account_verificator(account_verificator_id);
 
+  if (!p) return ngs::SQLError_access_denied();
+
+  if (is_cache_sha2 && record.cache2_enforced_format.has_value()) {
+    is_password_compilant = p->is_cache2_password_compliant(
+        record.cache2_enforced_format.value(), record.db_password_hash);
+  }
+
   // password check
-  if (!p || !p->verify_authentication_string(user, host, passwd,
-                                             record.db_password_hash))
+  if (!p->verify_authentication_string(
+          user, host, passwd, record.db_password_hash, is_password_compilant))
     return ngs::SQLError_access_denied();
 
   // password check succeeded but...
@@ -171,6 +186,10 @@ ngs::Error_code Account_verification_handler::verify_account(
     return ngs::SQLError(ER_ACCOUNT_HAS_BEEN_LOCKED,
                          authenication_info->m_tried_account_name.c_str(),
                          m_session->client().client_hostname_or_address());
+  }
+
+  if (!is_password_compilant) {
+    record.is_password_expired = true;
   }
 
   if (record.is_offline_mode_and_not_super_user)
@@ -207,14 +226,14 @@ ngs::Error_code Account_verification_handler::get_account_record(
   // The query asks for primary key, thus here we should get only one row
   if (result.size() != 1)
     return ngs::Error_code(ER_NO_SUCH_USER, "Invalid user or password");
-  result.get(&record.require_secure_transport, &record.db_password_hash,
-             &record.auth_plugin_name, &record.is_account_locked,
-             &record.is_password_expired,
-             &record.disconnect_on_expired_password,
-             &record.is_offline_mode_and_not_super_user,
-             &record.user_required.ssl_type, &record.user_required.ssl_cipher,
-             &record.user_required.ssl_x509_issuer,
-             &record.user_required.ssl_x509_subject);
+  result.get(
+      &record.require_secure_transport, &record.db_password_hash,
+      &record.auth_plugin_name, &record.is_account_locked,
+      &record.is_password_expired, &record.disconnect_on_expired_password,
+      &record.is_offline_mode_and_not_super_user,
+      &record.user_required.ssl_type, &record.user_required.ssl_cipher,
+      &record.user_required.ssl_x509_issuer,
+      &record.user_required.ssl_x509_subject, &record.cache2_enforced_format);
 
   if (result.is_server_status_set(SERVER_STATUS_IN_TRANS))
     result.query("COMMIT");
@@ -228,9 +247,6 @@ ngs::Error_code Account_verification_handler::get_offline_mode_error() const {
   char attr_value[1024] = "";
   size_t len_attr = sizeof(attr_value);
 
-  char user_value[USERNAME_CHAR_LENGTH + 1] = "";
-  size_t len_user = sizeof(user_value);
-
   char time_value[30] = "";
   size_t len_time = sizeof(time_value);
 
@@ -242,17 +258,12 @@ ngs::Error_code Account_verification_handler::get_offline_mode_error() const {
     if (service.is_valid()) {
       service->get(nullptr, "offline_mode", "reason", attr_value, &len_attr);
       service->get_time(nullptr, "offline_mode", time_value, &len_time);
-      service->get_user(nullptr, "offline_mode", user_value, &len_user);
     }
     mysql_plugin_registry_release(plugin_registry);
   }
 
   if (attr_value[0] != '\0') {
     return ngs::SQLError(ER_SERVER_OFFLINE_MODE_REASON, time_value, attr_value);
-  }
-
-  if (user_value[0] != '\0') {
-    return ngs::SQLError(ER_SERVER_OFFLINE_MODE_USER, time_value, user_value);
   }
 
   return ngs::SQLError(ER_SERVER_OFFLINE_MODE);
@@ -282,7 +293,9 @@ ngs::PFS_string Account_verification_handler::get_sql(
         "`disconnect_on_expired_password`, "
         "@@offline_mode and (`Super_priv`='N') as "
         "`is_offline_mode_and_not_super_user`, "
-        "`ssl_type`, `ssl_cipher`, `x509_issuer`, `x509_subject` "
+        "`ssl_type`, `ssl_cipher`, `x509_issuer`, `x509_subject`, "
+        "IF(@@caching_sha2_password_enforce_storage_format,@@caching_sha2_"
+        "password_storage_format,NULL) AS result "
         "FROM mysql.user WHERE ")
       .quote_string(user)
       .put(" = `user` AND ")

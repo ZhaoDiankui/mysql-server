@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2003, 2024, Oracle and/or its affiliates.
+   Copyright (c) 2003, 2026, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -282,7 +282,7 @@ void getTextArbitState(char *m_text, size_t m_text_len, const Uint32 *theData,
   // REPORT arbitrator found or lost.
   //-----------------------------------------------------------------------
   {
-    const ArbitSignalData *sd = (const ArbitSignalData *)theData;
+    const auto *sd = (const ArbitSignalData *)theData;
     char ticketText[ArbitTicket::TextLength + 1];
     char errText[ArbitCode::ErrTextLength + 1];
     const unsigned code = sd->code & 0xFFFF;
@@ -339,7 +339,7 @@ void getTextArbitResult(char *m_text, size_t m_text_len, const Uint32 *theData,
   // REPORT arbitration result (the failures may not reach us).
   //-----------------------------------------------------------------------
   {
-    const ArbitSignalData *sd = (const ArbitSignalData *)theData;
+    const auto *sd = (const ArbitSignalData *)theData;
     char errText[ArbitCode::ErrTextLength + 1];
     const unsigned code = sd->code & 0xFFFF;
     const unsigned state = sd->code >> 16;
@@ -657,6 +657,11 @@ void getTextMissedHeartbeat(char *m_text, size_t m_text_len,
   BaseString::snprintf(m_text, m_text_len, "Node %d missed heartbeat %d",
                        theData[1], theData[2]);
 }
+void getTextLateHeartbeat(char *m_text, size_t m_text_len,
+                          const Uint32 *theData, Uint32 /*len*/) {
+  BaseString::snprintf(m_text, m_text_len, "Node %d late heartbeat %dms",
+                       theData[1], theData[2]);
+}
 void getTextDeadDueToHeartbeat(char *m_text, size_t m_text_len,
                                const Uint32 *theData, Uint32 /*len*/) {
   BaseString::snprintf(m_text, m_text_len,
@@ -771,7 +776,7 @@ static void convert_unit(unsigned &data, const char *&unit) {
 
 static void convert_unit64(Uint64 &data, const char *&unit) {
   if ((data >> 32) == 0) {
-    Uint32 data_lo = (Uint32)data;
+    auto data_lo = (Uint32)data;
     convert_unit(data_lo, unit);
     data = data_lo;
     return;
@@ -1264,7 +1269,7 @@ void getTextReadLCPComplete(char *m_text, size_t m_text_len,
 
 void getTextRunRedo(char *m_text, size_t m_text_len, const Uint32 *theData,
                     Uint32 /*len*/) {
-  const ndb_logevent_RunRedo *ev = (const ndb_logevent_RunRedo *)(theData + 1);
+  const auto *ev = (const ndb_logevent_RunRedo *)(theData + 1);
   if (ev->currgci == ev->startgci) {
     BaseString::snprintf(m_text, m_text_len,
                          "Log part: %u phase: %u run redo from "
@@ -1537,6 +1542,7 @@ const EventLoggerBase::EventRepLogLevelMatrix EventLoggerBase::matrix[] = {
     ROW(TransporterError, LogLevel::llError, 2, Logger::LL_ERROR),
     ROW(TransporterWarning, LogLevel::llError, 8, Logger::LL_WARNING),
     ROW(MissedHeartbeat, LogLevel::llError, 8, Logger::LL_WARNING),
+    ROW(LateHeartbeat, LogLevel::llError, 8, Logger::LL_WARNING),
     ROW(DeadDueToHeartbeat, LogLevel::llError, 8, Logger::LL_ALERT),
     ROW(WarningEvent, LogLevel::llError, 2, Logger::LL_WARNING),
     ROW(SubscriptionStatus, LogLevel::llError, 4, Logger::LL_WARNING),

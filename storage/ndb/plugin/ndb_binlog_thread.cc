@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2014, 2024, Oracle and/or its affiliates.
+   Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -26,6 +26,7 @@
 // Implements
 #include "storage/ndb/plugin/ndb_binlog_thread.h"
 
+#include <cstddef>
 #include <cstdint>
 
 // Using
@@ -33,6 +34,7 @@
 #include "mysql/status_var.h"  // enum_mysql_show_type
 #include "nulls.h"             // NullS
 #include "sql/current_thd.h"   // current_thd
+#include "sql/rpl_injector.h"
 #include "storage/ndb/include/ndbapi/NdbError.hpp"
 #include "storage/ndb/plugin/ndb_apply_status_table.h"
 #include "storage/ndb/plugin/ndb_global_schema_lock_guard.h"  // Ndb_global_schema_lock_guard
@@ -304,11 +306,49 @@ bool Ndb_binlog_thread::Metadata_cache::load_fk_parents(
   return true;
 }
 
+void Ndb_binlog_thread::Binlog_file_tracker::publish_if_waiters() {
+  if (m_waiters.load(std::memory_order_acquire) <= 0) {
+    // No-one waiting, skip publish
+    return;
+  }
+  char logfilename[FN_REFLEN];
+  injector::get_current_binlog_filename(logfilename);
+
+  {
+    std::scoped_lock lock(m_lock);
+    m_filename = logfilename;
+    m_counter++;
+  }
+  m_cond.notify_all();
+}
+
+bool Ndb_binlog_thread::Binlog_file_tracker::wait_for_publish_once(
+    std::string &out_filename) {
+  m_waiters.fetch_add(1, std::memory_order_acq_rel);  // Enable publish
+
+  std::unique_lock<std::mutex> lock(m_lock);
+  const auto counter_before = m_counter;
+
+  // Predicate: sequence advanced (indicating a publish happened)
+  auto ready = [this, counter_before]() { return m_counter != counter_before; };
+
+  const bool signalled = m_cond.wait_for(lock, std::chrono::seconds(1), ready);
+  if (signalled) {
+    out_filename = m_filename;
+  }
+
+  m_waiters.fetch_sub(1, std::memory_order_acq_rel);
+  return signalled;
+}
+
 #ifndef NDEBUG
+#include <string>
 #include <tuple>
+#include <vector>
 
 #include "storage/ndb/plugin/ndb_anyvalue.h"
 #include "storage/ndb/plugin/ndb_require.h"
+#include "storage/ndb/plugin/ndb_table_guard.h"
 
 // Write some rows with specific values for server_id, defined in the
 // any-value of each operation. This is to check the behavior of the
@@ -405,6 +445,57 @@ void Ndb_binlog_thread::dbug_log_table_maps(Ndb *ndb, Uint64 current_epoch) {
     }
     if (trans->execute(NdbTransaction::Commit)) {
       log_ndb_error(const_cast<NdbError &>(trans->getNdbError()));
+    }
+    trans->close();
+  }
+}
+
+void Ndb_binlog_thread::dbug_log_multi_server_id(Ndb *ndb,
+                                                 Uint64 current_epoch) {
+  log_info("Logging multi server id rows");
+
+  // Build some rows (id, what, epoch, server-id)
+  constexpr int ROWS = 2;
+  // Avoid us same range of server_ids as configured servers
+  constexpr int SERVER_ID_OFFSET = 30;
+  std::vector<std::tuple<int, std::string, Uint64, int>> rows;
+  for (int i = 1; i <= ROWS; i++) {
+    const int server_id = SERVER_ID_OFFSET + i;
+    rows.emplace_back(server_id, "change from " + std::to_string(server_id),
+                      current_epoch, server_id);
+  }
+
+  // Open table created with:
+  // CREATE TABLE test_multi_server_id (
+  //   id INT PRIMARY KEY,
+  //   what VARCHAR(128),
+  //   epoch INT UNSIGNED
+  // ) ENGINE = NDB;
+  Ndb_table_guard ndbtab_g(ndb, "test", "test_multi_server_id");
+  ndbcluster::ndbrequire(ndbtab_g.get_table() != nullptr);
+
+  // Write rows to NDB, they will end up in the same epoch transaction in the
+  // binlog as they are written in same NDB transaction.
+  {
+    NdbTransaction *trans = ndb->startTransaction();
+    ndbcluster::ndbrequire(trans != nullptr);
+    for (const auto &row : rows) {
+      const auto [id, what, epoch, server_id] = row;
+      const size_t BUF_SIZE = 512;
+      char buf[BUF_SIZE];
+      ndb_pack_varchar(ndbtab_g.get_table(), 1, buf, what.c_str(),
+                       strlen(what.c_str()));
+      NdbOperation *op = trans->getNdbOperation(ndbtab_g.get_table());
+      ndbcluster::ndbrequire(op->updateTuple() == 0);
+      ndbcluster::ndbrequire(op->equal("id", id) == 0);
+      ndbcluster::ndbrequire(op->setValue("what", buf) == 0);
+      ndbcluster::ndbrequire(op->setValue("epoch", epoch) == 0);
+      Uint32 any_value = 0;
+      ndbcluster_anyvalue_set_serverid(any_value, server_id);
+      ndbcluster::ndbrequire(op->setAnyValue(any_value) == 0);
+    }
+    if (trans->execute(NdbTransaction::Commit) != 0) {
+      log_ndb_error(trans->getNdbError());
     }
     trans->close();
   }

@@ -1,4 +1,4 @@
-/* Copyright (c) 2018, 2024, Oracle and/or its affiliates.
+/* Copyright (c) 2018, 2026, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -30,6 +30,7 @@
 #include "sql/field.h"
 #include "sql/item.h"
 #include "sql/sql_class.h"
+#include "sql/sql_masking_policy.h"
 #include "sql_string.h"
 #include "template_utils.h"
 
@@ -63,25 +64,18 @@ struct CHARSET_INFO;
 Create_field::Create_field(Field *old_field, Field *orig_field)
     : hidden(old_field->hidden()),
       field_name(old_field->field_name),
-      change(nullptr),
       comment(old_field->comment),
       sql_type(old_field->real_type()),
       decimals(old_field->decimals()),
       flags(old_field->all_flags()),
       auto_flags(old_field->auto_flags),
       charset(old_field->charset()),  // May be NULL ptr
-      is_explicit_collation(false),
-      geom_type(Field::GEOM_GEOMETRY),
       field(old_field),
       is_nullable(old_field->is_nullable()),
-      is_zerofill(false),  // Init to avoid UBSAN warnings
-      is_unsigned(false),  // Init to avoid UBSAN warnings
-      treat_bit_as_char(
-          false),  // Init to avoid valgrind warnings in opt. build
-      pack_length_override(0),
       gcol_info(old_field->gcol_info),
       stored_in_db(old_field->stored_in_db),
       m_default_val_expr(old_field->m_default_val_expr),
+      m_masking_policy_name(old_field->masking_policy()),
       is_array(old_field->is_array()),
       m_engine_attribute(old_field->m_engine_attribute),
       m_secondary_engine_attribute(old_field->m_secondary_engine_attribute),
@@ -183,6 +177,8 @@ Create_field::Create_field(Field *old_field, Field *orig_field)
   @param fld_geom_type         Column geometry type (if any.)
   @param fld_gcol_info         Generated column data
   @param fld_default_val_expr  The expression for generating default values
+  @param fld_masking_policy    The name of the masking policy of this column,
+                               or an empty string if it has no masking policy.
   @param srid                  The SRID specification. This might be null
                                (has_value() may return false).
   @param hidden                Whether this column should be hidden or not.
@@ -202,8 +198,8 @@ bool Create_field::init(
     List<String> *fld_interval_list, const CHARSET_INFO *fld_charset,
     bool has_explicit_collation, uint fld_geom_type,
     Value_generator *fld_gcol_info, Value_generator *fld_default_val_expr,
-    std::optional<gis::srid_t> srid, dd::Column::enum_hidden_type hidden,
-    bool is_array_arg) {
+    LEX_CSTRING fld_masking_policy, std::optional<gis::srid_t> srid,
+    dd::Column::enum_hidden_type hidden, bool is_array_arg) {
   uint sign_len, allowed_type_modifier = 0;
   ulong max_field_charlength = MAX_FIELD_CHARLENGTH;
 
@@ -275,6 +271,8 @@ bool Create_field::init(
     auto_flags |= Field::GENERATED_FROM_EXPRESSION;
     m_default_val_expr = fld_default_val_expr;
   }
+
+  m_masking_policy_name = fld_masking_policy;
 
   // Initialize data for a virtual field or default value expression
   if (gcol_info || m_default_val_expr) {
@@ -407,7 +405,6 @@ bool Create_field::init(
     case MYSQL_TYPE_TINY_BLOB:
     case MYSQL_TYPE_LONG_BLOB:
     case MYSQL_TYPE_MEDIUM_BLOB:
-    case MYSQL_TYPE_JSON:
       if (fld_default_value) {
         /* Allow empty as default value. */
         String str, *res;
@@ -429,10 +426,12 @@ bool Create_field::init(
                               ER_THD(thd, ER_BLOB_CANT_HAVE_DEFAULT), fld_name);
         }
         constant_default = nullptr;
+        flags |= NO_DEFAULT_VALUE_FLAG;
       }
 
       flags |= BLOB_FLAG;
       break;
+    case MYSQL_TYPE_JSON:
     case MYSQL_TYPE_GEOMETRY:
       if (fld_default_value) {
         my_error(ER_BLOB_CANT_HAVE_DEFAULT, MYF(0), fld_name);

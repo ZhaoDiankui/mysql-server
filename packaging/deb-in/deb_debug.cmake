@@ -1,4 +1,4 @@
-# Copyright (c) 2017, 2024, Oracle and/or its affiliates.
+# Copyright (c) 2017, 2026, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0,
@@ -54,7 +54,7 @@ SET (DEB_RULES_DEBUG_MAKE
 SET (DEB_RULES_DEBUG_EXTRA
 "
 	# The ini file isn't built for debug, so copy over from the standard build
-	install -g root -o root -m 0755 debian/tmp/usr/lib/mysql/plugin/daemon_example.ini debian/tmp/usr/lib/mysql/plugin/debug
+	install -m 0755 debian/tmp/usr/lib/mysql/plugin/daemon_example.ini debian/tmp/usr/lib/mysql/plugin/debug
 ")
 
 SET (DEB_INSTALL_DEBUG_SERVER
@@ -75,6 +75,8 @@ usr/lib/mysql/plugin/debug/component_mysqlbackup.so
 usr/lib/mysql/plugin/debug/component_validate_password.so
 usr/lib/mysql/plugin/debug/component_query_attributes.so
 usr/lib/mysql/plugin/debug/component_reference_cache.so
+usr/lib/mysql/plugin/debug/component_telemetry.so
+usr/lib/mysql/plugin/debug/component_connection_control.so
 usr/lib/mysql/plugin/debug/ddl_rewriter.so
 usr/lib/mysql/plugin/debug/group_replication.so
 usr/lib/mysql/plugin/debug/connection_control.so
@@ -85,14 +87,17 @@ usr/lib/mysql/plugin/debug/mypluglib.so
 usr/lib/mysql/plugin/debug/mysql_clone.so
 usr/lib/mysql/plugin/debug/mysql_no_login.so
 usr/lib/mysql/plugin/debug/rewriter.so
-usr/lib/mysql/plugin/debug/semisync_master.so
-usr/lib/mysql/plugin/debug/semisync_slave.so
 usr/lib/mysql/plugin/debug/semisync_source.so
 usr/lib/mysql/plugin/debug/semisync_replica.so
+usr/lib/mysql/plugin/debug/telemetry_client.so
 usr/lib/mysql/plugin/debug/validate_password.so
-usr/lib/mysql/plugin/debug/version_token.so
 usr/lib/mysql/plugin/debug/component_audit_api_message_emit.so
 usr/lib/mysql/plugin/debug/component_keyring_file.so
+usr/lib/mysql/plugin/debug/component_classic_hashing.so
+usr/lib/mysql/plugin/debug/component_replication_applier_metrics.so
+usr/lib/mysql/plugin/debug/component_group_replication_flow_control_stats.so
+usr/lib/mysql/plugin/debug/component_group_replication_resource_manager.so
+usr/lib/mysql/plugin/debug/component_group_replication_elect_prefers_most_updated.so
 ")
 
 SET (DEB_INSTALL_DEBUG_TEST_PLUGINS
@@ -122,7 +127,12 @@ usr/lib/mysql/plugin/debug/component_test_host_application_signal.so
 usr/lib/mysql/plugin/debug/component_test_mysql_current_thread_reader.so
 usr/lib/mysql/plugin/debug/component_test_mysql_runtime_error.so
 usr/lib/mysql/plugin/debug/component_test_component_deinit.so
+usr/lib/mysql/plugin/debug/component_test_component_deinit_no_deadlock.so
+usr/lib/mysql/plugin/debug/component_test_component_init_fail.so
+usr/lib/mysql/plugin/debug/component_test_component_init_then_register.so
 usr/lib/mysql/plugin/debug/component_test_mysql_command_services.so
+usr/lib/mysql/plugin/debug/component_test_telemetry_resource_provider.so
+usr/lib/mysql/plugin/debug/component_test_telemetry_secret_provider.so
 usr/lib/mysql/plugin/debug/test_services_command_services.so
 usr/lib/mysql/plugin/debug/component_udf_reg_3_func.so
 usr/lib/mysql/plugin/debug/component_udf_reg_avg_func.so
@@ -190,6 +200,7 @@ usr/lib/mysql/plugin/debug/pfs_example_plugin_employee.so
 usr/lib/mysql/plugin/debug/component_pfs_example.so
 usr/lib/mysql/plugin/debug/component_mysqlx_global_reset.so
 usr/lib/mysql/plugin/debug/component_test_audit_api_message.so
+usr/lib/mysql/plugin/debug/component_test_udf_aggregate.so
 usr/lib/mysql/plugin/debug/component_test_udf_services.so
 usr/lib/mysql/plugin/debug/component_test_mysql_system_variable_set.so
 usr/lib/mysql/plugin/debug/component_test_table_access.so
@@ -206,6 +217,7 @@ usr/lib/mysql/plugin/debug/component_test_event_tracking_consumer_a.so
 usr/lib/mysql/plugin/debug/component_test_event_tracking_producer_a.so
 usr/lib/mysql/plugin/debug/component_test_event_tracking_consumer.so
 usr/lib/mysql/plugin/debug/component_test_event_tracking_producer_b.so
+usr/lib/mysql/plugin/debug/component_test_mysql_file_service.so
 ")
 
 IF (DEB_PRODUCT STREQUAL "commercial")
@@ -213,30 +225,32 @@ IF (DEB_PRODUCT STREQUAL "commercial")
   IF (DEFINED DEB_WITH_DEBUG)
     SET (DEB_INSTALL_DEBUG_SERVER_PLUGINS "${DEB_INSTALL_DEBUG_SERVER_PLUGINS}
 usr/lib/mysql/plugin/debug/audit_log.so
+usr/lib/mysql/plugin/debug/component_audit_log.so
 usr/lib/mysql/plugin/debug/authentication_pam.so
 usr/lib/mysql/plugin/debug/authentication_ldap_sasl.so
 usr/lib/mysql/plugin/debug/authentication_kerberos.so
 usr/lib/mysql/plugin/debug/authentication_openid_connect.so
 usr/lib/mysql/plugin/debug/authentication_ldap_simple.so
-usr/lib/mysql/plugin/debug/telemetry_client.so
 usr/lib/mysql/plugin/debug/data_masking.so
 usr/lib/mysql/plugin/debug/keyring_okv.so
 usr/lib/mysql/plugin/debug/keyring_hashicorp.so
 usr/lib/mysql/plugin/debug/thread_pool.so
 usr/lib/mysql/plugin/debug/firewall.so
 usr/lib/mysql/plugin/debug/component_keyring_encrypted_file.so
+usr/lib/mysql/plugin/debug/component_keyring_hashicorp.so
+usr/lib/mysql/plugin/debug/component_keyring_kmip.so
 usr/lib/mysql/plugin/debug/component_keyring_oci.so
 usr/lib/mysql/plugin/debug/component_enterprise_encryption.so
 usr/lib/mysql/plugin/debug/component_masking.so
 usr/lib/mysql/plugin/debug/component_masking_functions.so
 usr/lib/mysql/plugin/debug/component_mle.so
 usr/lib/mysql/plugin/debug/component_scheduler.so
-usr/lib/mysql/plugin/debug/component_telemetry.so
 usr/lib/mysql/plugin/debug/component_option_tracker.so
-usr/lib/mysql/plugin/debug/component_group_replication_flow_control_stats.so
-usr/lib/mysql/plugin/debug/component_replication_applier_metrics.so
+usr/lib/mysql/plugin/debug/component_firewall.so
 usr/lib/mysql/plugin/debug/authentication_webauthn.so
+usr/lib/mysql/plugin/debug/component_object_policy.so
 ")
+
   ENDIF()
 
   IF (DEB_AWS_SDK)
@@ -257,6 +271,7 @@ usr/lib/mysql/plugin/debug/component_keyring_aws.so
       MESSAGE(STATUS "Environment variable AWS_VER not set, skip packaging component_keyring_aws.")
     ENDIF()
   ENDIF()
+
   SET (DEB_INSTALL_DEBUG_TEST_PLUGINS "${DEB_INSTALL_DEBUG_TEST_PLUGINS}
 usr/lib/mysql/plugin/debug/component_test_global_priv_registration.so
 usr/lib/mysql/plugin/debug/component_test_page_track_component.so

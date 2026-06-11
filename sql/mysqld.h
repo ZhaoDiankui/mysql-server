@@ -180,6 +180,9 @@ extern MYSQL_PLUGIN_IMPORT std::atomic<int32>
     connection_events_loop_aborted_flag;
 extern bool opt_no_dd_upgrade;
 extern long opt_upgrade_mode;
+#ifdef WESQL
+extern bool opt_upgrade_wesql;
+#endif
 extern bool opt_initialize;
 extern bool opt_safe_user_create;
 extern bool opt_local_infile, opt_myisam_use_mmap;
@@ -541,6 +544,22 @@ extern PSI_file_key key_file_hash_join;
 extern PSI_socket_key key_socket_tcpip;
 extern PSI_socket_key key_socket_unix;
 extern PSI_socket_key key_socket_client_connection;
+
+#ifdef WESQL_CLUSTER
+extern PSI_cond_key key_consensus_info_data_cond;
+extern PSI_cond_key key_consensus_info_start_cond;
+extern PSI_cond_key key_consensus_info_stop_cond;
+extern PSI_cond_key key_consensus_info_sleep_cond;
+
+extern PSI_mutex_key key_consensus_info_data_lock;
+extern PSI_mutex_key key_consensus_info_run_lock;
+extern PSI_mutex_key key_consensus_info_sleep_lock;
+extern PSI_mutex_key key_consensus_info_thd_lock;
+
+extern PSI_rwlock_key key_LOCK_consensus_info;
+extern PSI_rwlock_key key_LOCK_consensus_applier_info;
+extern PSI_rwlock_key key_LOCK_consensus_applier_worker;
+#endif
 
 #endif /* HAVE_PSI_INTERFACE */
 

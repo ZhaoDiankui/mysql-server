@@ -2952,6 +2952,19 @@ static bool fix_max_binlog_size(sys_var *, THD *, enum_var_type) {
     }
     channel_map.unlock();
   }
+
+#ifdef WESQL_CLUSTER
+  if (is_consensus_replication_enabled()) {
+    channel_map.wrlock();
+    for (mi_map::iterator it = channel_map.begin(CONSENSUS_REPLICATION_CHANNEL);
+         it != channel_map.end(CONSENSUS_REPLICATION_CHANNEL); it++) {
+      Master_info *mi = it->second;
+      if (mi != nullptr) mi->rli->relay_log.set_max_size(max_binlog_size);
+    }
+    channel_map.unlock();
+  }
+#endif
+
   return false;
 }
 static Sys_var_ulong Sys_max_binlog_size(
@@ -4176,6 +4189,22 @@ static bool check_slave_stopped(sys_var *self, THD *thd, set_var *var) {
       mysql_mutex_unlock(&mi->rli->run_lock);
     }
   }
+
+#ifdef WESQL_CLUSTER
+  if (is_consensus_replication_enabled()) {
+    for (mi_map::iterator it = channel_map.begin(CONSENSUS_REPLICATION_CHANNEL);
+         it != channel_map.end(CONSENSUS_REPLICATION_CHANNEL); it++) {
+      mi = it->second;
+      mysql_mutex_lock(&mi->rli->run_lock);
+      if (mi->rli->slave_running) {
+        my_error(ER_REPLICA_SQL_THREAD_MUST_STOP, MYF(0));
+        result = true;
+      }
+      mysql_mutex_unlock(&mi->rli->run_lock);
+    }
+  }
+#endif
+
   channel_map.unlock();
   return result;
 }
@@ -7532,6 +7561,14 @@ static Sys_var_charptr Sys_protocol_compression_algorithms(
     DEFAULT(const_cast<char *>(PROTOCOL_COMPRESSION_DEFAULT_VALUE)),
     NO_MUTEX_GUARD, NOT_IN_BINLOG,
     ON_CHECK(check_set_protocol_compression_algorithms), ON_UPDATE(nullptr));
+#ifdef WESQL
+static char *wesql_version_ptr = NULL;
+
+static Sys_var_charptr Sys_wesql_version(
+    "wesql_version", "Version of the WeSQL",
+    READ_ONLY GLOBAL_VAR(wesql_version_ptr), NO_CMD_LINE, IN_SYSTEM_CHARSET,
+    DEFAULT(WESQL_VERSION));
+#endif
 
 static bool check_set_require_row_format(sys_var *, THD *thd, set_var *var) {
   /*

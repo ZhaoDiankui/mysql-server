@@ -2288,6 +2288,11 @@ typedef void (*post_ddl_t)(THD *thd);
 typedef void (*post_recover_t)(void);
 
 /**
+  Perform SE-specific initialization after recovery of binlog/gtid.
+*/
+typedef void (*post_engine_recover_t)(void);
+
+/**
   Lock a handlerton (resource) log to collect log information.
 */
 

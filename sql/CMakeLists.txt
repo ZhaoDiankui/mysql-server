@@ -633,7 +633,25 @@ SET(SQL_SHARED_SOURCES
   xa/transaction_cache.cc
   xa/xid_extract.cc
   daemon_proxy_keyring/daemon_proxy_keyring.cc
+)
+
+IF(WITH_WESQL)
+  LIST(APPEND SQL_SHARED_SOURCES
+    common/component.cc
+    package/package.cc
+    package/package_cache.cc
+    package/package_common.cc
+    package/proc.cc
+    package/package_parse.cc
+    package/proc_dummy.cc
+    package/show_native_procedure.cc
   )
+  IF(WITH_RAFT_REPLICATION)
+    LIST(APPEND SQL_SHARED_SOURCES
+      rpl_consensus_replication.cc
+    )
+  ENDIF()
+ENDIF()
 
 IF(BUILD_IS_SINGLE_CONFIG)
   GET_PROPERTY(CWD_DEFINITIONS DIRECTORY PROPERTY COMPILE_DEFINITIONS)
@@ -958,6 +976,12 @@ ADD_DEPENDENCIES(sql_gis GenError)
 TARGET_LINK_LIBRARIES(sql_gis sql_dd sql_main)
 SET_TARGET_PROPERTIES(sql_gis PROPERTIES LINK_INTERFACE_MULTIPLICITY 3)
 
+# Boost 1.77 MPL library triggers -Wenum-constexpr-conversion on Clang 15+
+MY_CHECK_CXX_COMPILER_WARNING("enum-constexpr-conversion" HAVE_ENUM_CONSTEXPR_CONVERSION)
+IF(HAVE_ENUM_CONSTEXPR_CONVERSION)
+  TARGET_COMPILE_OPTIONS(sql_gis PRIVATE ${HAVE_ENUM_CONSTEXPR_CONVERSION})
+ENDIF()
+
 # This typically saves a few hundred megabytes of disk space.
 IF(COMPRESS_DEBUG_SECTIONS)
   MY_CHECK_CXX_COMPILER_FLAG("-gz" HAVE_COMPRESS_GZ_OPTION)
@@ -1089,6 +1113,16 @@ SET (RPL_REPLICA_SRCS
   udf_service_impl.cc
   udf_service_util.cc
   )
+
+IF(WITH_RAFT_REPLICATION)
+  LIST(APPEND RPL_REPLICA_SRCS
+    consensus/consensus_info.cc
+    consensus/consensus_info_factory.cc
+    consensus/consensus_applier_info.cc
+    consensus/consensus_applier_worker.cc
+  )
+ENDIF()
+
 ADD_LIBRARY(rpl_replica STATIC ${RPL_REPLICA_SRCS})
 ADD_DEPENDENCIES(rpl_replica GenError)
 TARGET_LINK_LIBRARIES(rpl_replica

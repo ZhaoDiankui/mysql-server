@@ -774,15 +774,15 @@ MySQL clients support the protocol:
 #include "sql/auth/auth_common.h"         // grant_init
 #include "sql/auth/sql_authentication.h"  // init_rsa_keys
 #include "sql/auth/sql_security_ctx.h"
-#include "sql/auto_thd.h"   // Auto_THD
-#include "sql/binlog.h"     // mysql_bin_log
-#include "sql/bootstrap.h"  // bootstrap
+#include "sql/auto_thd.h"        // Auto_THD
+#include "sql/binlog.h"          // mysql_bin_log
+#include "sql/bootstrap.h"       // bootstrap
 #include "sql/check_stack.h"
 #include "sql/conn_handler/connection_acceptor.h"  // Connection_acceptor
 #include "sql/conn_handler/connection_handler_impl.h"  // Per_thread_connection_handler
 #include "sql/conn_handler/connection_handler_manager.h"  // Connection_handler_manager
 #include "sql/conn_handler/socket_connection.h"  // stmt_info_new_packet
-#include "sql/current_thd.h"                     // current_thd
+#include "sql/current_thd.h"  // current_thd
 #include "sql/dd/cache/dictionary_client.h"
 #include "sql/debug_sync.h"  // debug_sync_end
 #include "sql/derror.h"
@@ -884,6 +884,10 @@ MySQL clients support the protocol:
 #include "thr_mutex.h"
 #include "typelib.h"
 #include "violite.h"
+
+#ifdef WESQL
+#include "sql/package/package_interface.h"
+#endif
 
 #ifdef WITH_PERFSCHEMA_STORAGE_ENGINE
 #include "storage/perfschema/pfs_server.h"
@@ -1221,6 +1225,9 @@ bool opt_no_monitor = false;
 
 bool opt_no_dd_upgrade = false;
 long opt_upgrade_mode = UPGRADE_AUTO;
+#ifdef WESQL
+bool opt_upgrade_wesql = false;
+#endif
 bool opt_initialize = false;
 bool opt_skip_replica_start = false;  ///< If set, slave is not autostarted
 bool opt_enable_named_pipe = false;
@@ -4272,6 +4279,10 @@ SHOW_VAR com_status_vars[] = {
      (char *)offsetof(System_status_var,
                       com_stat[(uint)SQLCOM_SHOW_BINLOG_EVENTS]),
      SHOW_LONG_STATUS, SHOW_SCOPE_ALL},
+    {"show_consensuslogs",
+     (char *)offsetof(System_status_var,
+                      com_stat[(uint)SQLCOM_SHOW_CONSENSUSLOGS]),
+     SHOW_LONG_STATUS, SHOW_SCOPE_ALL},
     {"show_binlogs",
      (char *)offsetof(System_status_var, com_stat[(uint)SQLCOM_SHOW_BINLOGS]),
      SHOW_LONG_STATUS, SHOW_SCOPE_ALL},
@@ -4443,6 +4454,14 @@ SHOW_VAR com_status_vars[] = {
      (char *)offsetof(System_status_var,
                       com_stat[(uint)SQLCOM_STOP_GROUP_REPLICATION]),
      SHOW_LONG_STATUS, SHOW_SCOPE_ALL},
+    {"raft_replication_start",
+     (char *)offsetof(System_status_var,
+                      com_stat[(uint)SQLCOM_START_RAFT_REPLICATION]),
+     SHOW_LONG_STATUS, SHOW_SCOPE_ALL},
+    {"raft_replication_stop",
+     (char *)offsetof(System_status_var,
+                      com_stat[(uint)SQLCOM_STOP_RAFT_REPLICATION]),
+     SHOW_LONG_STATUS, SHOW_SCOPE_ALL},
     {"stmt_execute", (char *)offsetof(System_status_var, com_stmt_execute),
      SHOW_LONG_STATUS, SHOW_SCOPE_ALL},
     {"stmt_close", (char *)offsetof(System_status_var, com_stmt_close),
@@ -4497,6 +4516,16 @@ SHOW_VAR com_status_vars[] = {
      SHOW_LONG_STATUS, SHOW_SCOPE_ALL},
     {"xa_start",
      (char *)offsetof(System_status_var, com_stat[(uint)SQLCOM_XA_START]),
+     SHOW_LONG_STATUS, SHOW_SCOPE_ALL},
+    {"native_admin_proc",
+     (char *)offsetof(System_status_var, com_stat[(uint)SQLCOM_ADMIN_PROC]),
+     SHOW_LONG_STATUS, SHOW_SCOPE_ALL},
+    {"native_trans_proc",
+     (char *)offsetof(System_status_var, com_stat[(uint)SQLCOM_TRANS_PROC]),
+     SHOW_LONG_STATUS, SHOW_SCOPE_ALL},
+    {"show_consensuslog_events",
+     (char *)offsetof(System_status_var,
+                      com_stat[(uint)SQLCOM_SHOW_CONSENSUSLOG_EVENTS]),
      SHOW_LONG_STATUS, SHOW_SCOPE_ALL},
     {NullS, NullS, SHOW_LONG, SHOW_SCOPE_ALL}};
 
@@ -6785,6 +6814,27 @@ static int init_server_components() {
     unireg_abort(1);
   }
 
+#ifdef WESQL
+  if (!is_help_or_validate_option()) {
+    bool r = false;
+    init_optimizer_cost_module(true);
+    if (opt_initialize || dd_upgrade_was_initiated) {
+      r = ::bootstrap::run_bootstrap_thread(
+          nullptr, nullptr, &dd::upgrade::initialize_wesql_schemas,
+          SYSTEM_THREAD_SERVER_INITIALIZE);
+    } else if (opt_upgrade_wesql) {
+      r = ::bootstrap::run_bootstrap_thread(
+          nullptr, nullptr, &dd::upgrade::initialize_wesql_schemas,
+          SYSTEM_THREAD_SERVER_UPGRADE);
+    }
+    delete_optimizer_cost_module();
+    if (r) {
+      LogErr(ERROR_LEVEL, ER_SERVER_UPGRADE_FAILED);
+      unireg_abort(MYSQLD_ABORT_EXIT);
+    }
+  }
+#endif
+
   if (opt_initialize) log_output_options = LOG_FILE;
 
   /*
@@ -6890,7 +6940,14 @@ static int init_server_components() {
     unireg_abort(MYSQLD_ABORT_EXIT);
   }
 
-  if (opt_bin_log) {
+#ifdef WESQL_CLUSTER
+  if (!NO_HOOK(binlog_manager)) {
+    if (RUN_HOOK(binlog_manager, after_binlog_recovery, (&mysql_bin_log))) {
+      unireg_abort(MYSQLD_ABORT_EXIT);
+    }
+  } else
+#endif
+      if (opt_bin_log) {
     /*
       Configures what object is used by the current log to store processed
       gtid(s). This is necessary in the MYSQL_BIN_LOG::MYSQL_BIN_LOG to
@@ -7531,6 +7588,11 @@ int mysqld_main(int argc, char **argv)
   */
   init_server_psi_keys();
 
+  /* Init conconcurrency control system */
+#ifdef WESQL
+  im::package_context_init();
+#endif
+
   /*
     Now that some instrumentation is in place,
     recreate objects which were initialised early,
@@ -7879,6 +7941,16 @@ int mysqld_main(int argc, char **argv)
     if (gtid_state->read_gtid_executed_from_table() == -1) unireg_abort(1);
   }
 
+#ifdef WESQL_CLUSTER
+  if (!NO_HOOK(binlog_manager)) {
+    if (RUN_HOOK(binlog_manager, gtid_recovery, (&mysql_bin_log))) {
+      unireg_abort(MYSQLD_ABORT_EXIT);
+    }
+    if (RUN_HOOK(server_state, after_engine_recovery, (nullptr))) {
+      unireg_abort(MYSQLD_ABORT_EXIT);
+    }
+  } else
+#endif
   if (opt_bin_log) {
     /*
       Initialize GLOBAL.GTID_EXECUTED and GLOBAL.GTID_PURGED from
@@ -8133,8 +8205,13 @@ int mysqld_main(int argc, char **argv)
 
   initialize_information_schema_acl();
 
+#ifdef WESQL_CLUSTER
+  if (RUN_HOOK(server_state, after_recovery, (nullptr)))
+    unireg_abort(MYSQLD_ABORT_EXIT);
+#else
   (void)RUN_HOOK(server_state, after_recovery, (nullptr));
-
+#endif
+  
   if (Events::init(opt_noacl || opt_initialize))
     unireg_abort(MYSQLD_ABORT_EXIT);
 
@@ -9266,6 +9343,12 @@ struct my_option my_long_options[] = {
      "server if required; FORCE to force upgrade server.",
      &opt_upgrade_mode, &opt_upgrade_mode, &upgrade_mode_typelib, GET_ENUM,
      REQUIRED_ARG, UPGRADE_AUTO, 0, 0, nullptr, 0, nullptr},
+
+#ifdef WESQL
+    {"upgrade-wesql", 0, "Set server upgrade system tables for wesql.",
+     &opt_upgrade_wesql, &opt_upgrade_wesql, nullptr, GET_BOOL, NO_ARG, 0, 0, 0,
+     nullptr, 0, nullptr},
+#endif
 
     {nullptr, 0, nullptr, nullptr, nullptr, nullptr, GET_NO_ARG, NO_ARG, 0, 0,
      0, nullptr, 0, nullptr}};
@@ -11184,6 +11267,11 @@ static void set_server_version(void) {
 #ifndef NDEBUG
   if (!strstr(MYSQL_SERVER_SUFFIX_STR, "-debug"))
     end = my_stpcpy(end, "-debug");
+#if defined(WESQL) && defined(WESQL_TEST)
+  if (SERVER_VERSION_LENGTH - (end - server_version) >
+      static_cast<int>(sizeof("-wtest")))
+    end = my_stpcpy(end, "-wtest");
+#endif
 #endif
 #ifdef HAVE_VALGRIND
   if (SERVER_VERSION_LENGTH - (end - server_version) >
@@ -11795,6 +11883,13 @@ PSI_mutex_key key_monitor_info_run_lock;
 PSI_mutex_key key_LOCK_delegate_connection_mutex;
 PSI_mutex_key key_LOCK_group_replication_connection_mutex;
 
+#ifdef WESQL_CLUSTER
+PSI_mutex_key key_consensus_info_data_lock;
+PSI_mutex_key key_consensus_info_run_lock;
+PSI_mutex_key key_consensus_info_sleep_lock;
+PSI_mutex_key key_consensus_info_thd_lock;
+#endif
+
 /* clang-format off */
 static PSI_mutex_info all_server_mutexes[]=
 {
@@ -11861,6 +11956,12 @@ static PSI_mutex_info all_server_mutexes[]=
   { &key_mutex_slave_parallel_pend_jobs, "Relay_log_info::pending_jobs_lock", 0, 0, PSI_DOCUMENT_ME},
   { &key_mutex_slave_parallel_worker_count, "Relay_log_info::exit_count_lock", 0, 0, PSI_DOCUMENT_ME},
   { &key_mutex_slave_parallel_worker, "Worker_info::jobs_lock", 0, 0, PSI_DOCUMENT_ME},
+#ifdef WESQL_CLUSTER
+  {&key_consensus_info_data_lock, "Consensus_info::data_lock", 0, 0, PSI_DOCUMENT_ME},
+  {&key_consensus_info_run_lock, "Consensus_info::run_lock", 0, 0, PSI_DOCUMENT_ME},
+  {&key_consensus_info_sleep_lock, "Consensus_info::sleep_lock", 0, 0, PSI_DOCUMENT_ME},
+  {&key_consensus_info_thd_lock, "Consensus_info::info_thd_lock", 0, 0, PSI_DOCUMENT_ME},
+#endif
   { &key_TABLE_SHARE_LOCK_ha_data, "TABLE_SHARE::LOCK_ha_data", 0, 0, PSI_DOCUMENT_ME},
   { &key_LOCK_error_messages, "LOCK_error_messages", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
   { &key_LOCK_log_throttle_qni, "LOCK_log_throttle_qni", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
@@ -11887,7 +11988,7 @@ static PSI_mutex_info all_server_mutexes[]=
   { &key_monitor_info_run_lock, "Source_IO_monitor::run_lock", 0, 0, PSI_DOCUMENT_ME},
   { &key_LOCK_delegate_connection_mutex, "LOCK_delegate_connection_mutex", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
   { &key_LOCK_group_replication_connection_mutex, "LOCK_group_replication_connection_mutex", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
-{ &key_LOCK_authentication_policy, "LOCK_authentication_policy", PSI_FLAG_SINGLETON, 0, "A lock to ensure execution of CREATE USER or ALTER USER sql and SET @@global.authentication_policy variable are serialized"},
+  { &key_LOCK_authentication_policy, "LOCK_authentication_policy", PSI_FLAG_SINGLETON, 0, "A lock to ensure execution of CREATE USER or ALTER USER sql and SET @@global.authentication_policy variable are serialized"},
   { &key_LOCK_global_conn_mem_limit, "LOCK_global_conn_mem_limit", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME}
 };
 /* clang-format on */
@@ -11906,6 +12007,14 @@ PSI_rwlock_key key_rwlock_Binlog_transmit_delegate_lock;
 PSI_rwlock_key key_rwlock_Binlog_relay_IO_delegate_lock;
 PSI_rwlock_key key_rwlock_resource_group_mgr_map_lock;
 
+#ifdef WESQL_CLUSTER
+PSI_rwlock_key key_rwlock_Binlog_applier_delegate_lock;
+PSI_rwlock_key key_rwlock_Binlog_manager_delegate_lock;
+PSI_rwlock_key key_LOCK_consensus_info;
+PSI_rwlock_key key_LOCK_consensus_applier_info;
+PSI_rwlock_key key_LOCK_consensus_applier_worker;
+#endif
+
 /* clang-format off */
 static PSI_rwlock_info all_server_rwlocks[]=
 {
@@ -11922,6 +12031,13 @@ static PSI_rwlock_info all_server_rwlocks[]=
   { &key_rwlock_Trans_delegate_lock, "Trans_delegate::lock", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
   { &key_rwlock_Server_state_delegate_lock, "Server_state_delegate::lock", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
   { &key_rwlock_Binlog_storage_delegate_lock, "Binlog_storage_delegate::lock", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
+#ifdef WESQL_CLUSTER
+  { &key_rwlock_Binlog_applier_delegate_lock, "Binlog_applier_delegate::lock", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
+  { &key_rwlock_Binlog_manager_delegate_lock, "Binlog_manager_delegate::lock", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
+  { &key_LOCK_consensus_info, "Consensus_info::LOCK_info", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
+  { &key_LOCK_consensus_applier_info, "Consensus_applier_info::LOCK_info", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
+  { &key_LOCK_consensus_applier_worker, "Consensus_applier_worker::LOCK_info", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
+#endif
   { &key_rwlock_receiver_sid_lock, "gtid_retrieved", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
   { &key_rwlock_rpl_filter_lock, "rpl_filter_lock", 0, 0, PSI_DOCUMENT_ME},
   { &key_rwlock_channel_to_filter_lock, "channel_to_filter_lock", 0, 0, PSI_DOCUMENT_ME},
@@ -11960,6 +12076,12 @@ PSI_cond_key key_cond_slave_worker_hash;
 PSI_cond_key key_monitor_info_run_cond;
 PSI_cond_key key_COND_delegate_connection_cond_var;
 PSI_cond_key key_COND_group_replication_connection_cond_var;
+#ifdef WESQL_CLUSTER
+PSI_cond_key key_consensus_info_data_cond;
+PSI_cond_key key_consensus_info_start_cond;
+PSI_cond_key key_consensus_info_stop_cond;
+PSI_cond_key key_consensus_info_sleep_cond;
+#endif
 
 /* clang-format off */
 static PSI_cond_info all_server_conds[]=
@@ -11997,6 +12119,12 @@ static PSI_cond_info all_server_conds[]=
   { &key_cond_slave_parallel_pend_jobs, "Relay_log_info::pending_jobs_cond", 0, 0, PSI_DOCUMENT_ME},
   { &key_cond_slave_parallel_worker, "Worker_info::jobs_cond", 0, 0, PSI_DOCUMENT_ME},
   { &key_cond_mta_gaq, "Relay_log_info::mta_gaq_cond", 0, 0, PSI_DOCUMENT_ME},
+#ifdef WESQL_CLUSTER
+  {&key_consensus_info_data_cond, "Consensus_info::data_cond", 0, 0, PSI_DOCUMENT_ME},
+  {&key_consensus_info_start_cond, "Consensus_info::start_cond", 0, 0, PSI_DOCUMENT_ME},
+  {&key_consensus_info_stop_cond, "Consensus_info::stop_cond", 0, 0, PSI_DOCUMENT_ME},
+  {&key_consensus_info_sleep_cond, "Consensus_info::sleep_cond", 0, 0, PSI_DOCUMENT_ME},
+#endif
   { &key_gtid_ensure_index_cond, "Gtid_state", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
   { &key_COND_compress_gtid_table, "COND_compress_gtid_table", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
   { &key_commit_order_manager_cond, "Commit_order_manager::m_workers.cond", 0, 0, PSI_DOCUMENT_ME},

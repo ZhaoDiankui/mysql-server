@@ -83,6 +83,13 @@ class Rpl_applier_reader {
   */
   Log_event *read_next_event();
 
+#ifdef WESQL_CLUSTER
+  bool is_reading_active_log() { return m_reading_active_log; }
+  /* Purge logs by other thread and reset the log file index offset */
+  LOG_INFO *get_log_info() { return &m_linfo; }
+  bool reload_active_log_end_pos();
+#endif
+
  private:
   Relaylog_file_reader m_relaylog_file_reader;
   Relay_log_info *m_rli = nullptr;

@@ -31,3 +31,7 @@ scalability_jobs_*
 .cproject
 .project
 .settings/
+
+bu-Debug/
+.joycode/
+extra/

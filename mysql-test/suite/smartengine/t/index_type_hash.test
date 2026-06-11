@@ -1,0 +1,13 @@
+--source suite/smartengine/include/have_smartengine.inc
+
+#
+# Index type HASH
+#
+
+let $index_type = HASH;
+
+--source index.inc
+
+let $index_type =;
+
+--source suite/smartengine/include/check_smartengine_log_error.inc

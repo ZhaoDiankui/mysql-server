@@ -1,0 +1,4 @@
+--source include/resource_group_init.inc
+--source include/resource_group_binlog.inc
+
+--source suite/smartengine/include/check_smartengine_log_error.inc

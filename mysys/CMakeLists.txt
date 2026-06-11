@@ -26,6 +26,37 @@ SET(MY_TIME_SOURCES my_time.cc my_systime.cc)
 
 ADD_CONVENIENCE_LIBRARY(mytime ${MY_TIME_SOURCES})
 
+SET(MY_OBJSTORE_SOURCES
+  objstore/local.cc
+  objstore/objstore.cc
+  objstore/objstore_lock.cc
+  objstore/aliyun_oss.cc
+  objstore/s3.cc)
+
+ADD_CONVENIENCE_LIBRARY(myobjstore ${MY_OBJSTORE_SOURCES})
+
+IF(NOT APPLE)
+  TARGET_LINK_LIBRARIES(myobjstore_objlib
+    PRIVATE
+    ${OBJSTORE_LIBRARIES}
+    ${OBJSTORE_OSS_LIBRARIES}
+    ${OBJSTORE_PLATFORM_DEPS}
+    )
+  add_dependencies(myobjstore_objlib ${OBJSTORE_OSS_TARGET})
+ENDIF()
+TARGET_LINK_LIBRARIES(myobjstore
+  PRIVATE
+  ${OBJSTORE_LIBRARIES}
+  ${OBJSTORE_OSS_LIBRARIES}
+  ${OBJSTORE_PLATFORM_DEPS}
+  "stdc++fs"
+  )
+add_dependencies(myobjstore ${OBJSTORE_OSS_TARGET})
+
+# shut up the compile warning when encountering aws-sdk-cpp header files.
+SET_SOURCE_FILES_PROPERTIES(${MY_OBJSTORE_SOURCES} PROPERTIES COMPILE_FLAGS
+    "-Wno-error=extra-semi -Wno-error=undef -Wno-error=cast-qual -Wno-error=overloaded-virtual -Wno-error=unused-variable -Wno-error=unused-parameter -Wno-error=suggest-override")
+
 SET(MYSYS_SOURCES
   array.cc
   charset.cc
@@ -184,6 +215,7 @@ ENDIF()
 ADD_CONVENIENCE_LIBRARY(mysys ${MYSYS_SOURCES}
   LINK_LIBRARIES
   mytime
+  myobjstore
   strings
   ext::zlib
   ext::zstd

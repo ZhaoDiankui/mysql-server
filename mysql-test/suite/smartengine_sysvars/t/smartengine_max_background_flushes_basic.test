@@ -1,0 +1,7 @@
+--source suite/smartengine/include/have_smartengine.inc
+
+--let $sys_var=SMARTENGINE_MAX_BACKGROUND_FLUSHES
+--let $read_only=1
+--let $session=0
+--source ../inc/smartengine_sys_var.inc
+

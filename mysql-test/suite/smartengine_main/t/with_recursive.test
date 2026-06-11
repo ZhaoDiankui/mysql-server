@@ -1,0 +1,9 @@
+--echo # In-memory tmp tables
+set big_tables=0;
+--source ./with_recursive_smartengine.inc
+
+--echo # On-disk tmp tables
+set big_tables=1;
+--source ./with_recursive_smartengine.inc
+
+--source suite/smartengine/include/check_smartengine_log_error.inc

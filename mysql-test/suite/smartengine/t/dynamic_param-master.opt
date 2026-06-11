@@ -1,0 +1,1 @@
+--smartengine_flush_log_at_trx_commit=1 --smartengine_compaction_threads=4 --smartengine_flush_threads=2

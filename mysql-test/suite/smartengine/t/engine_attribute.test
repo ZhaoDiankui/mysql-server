@@ -1,0 +1,171 @@
+--source suite/smartengine/include/have_smartengine.inc
+
+--disable_warnings
+DROP TABLE IF EXISTS t1;
+--enable_warnings
+
+######## BASIC SYNTAX CHECK ######
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE;
+DROP TABLE t1;
+
+## invalid json format
+--error ER_INVALID_JSON_ATTRIBUTE
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{abc}';
+
+## unsupported engine attribute type
+--error 1030
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"abc":1}';
+
+#### engine attribute: data_format ####
+## wrong data format value type
+--error 1030
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"data_format":1}';
+## unsupported data format type
+--error 1030
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"data_format":"ppl"}';
+## misspelling of data format
+--error 1030
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"adata_format":"row"}';
+--error 1030
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"data_formata":"row"}';
+## right engine attribute data format
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"data_format":"row"}';
+DROP TABLE t1;
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"data_format":"columnar"}';
+DROP TABLE t1;
+## case insensitive
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"DATA_FORMAT":"ROW"}';
+DROP TABLE t1;
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"data_Format":"Row"}';
+DROP TABLE t1;
+
+#### engine attribute: block_size ####
+## wrong block size value type
+--error 1030
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"block_size":"summer"}';
+--error 1030
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"block_size":0}';
+--error 1030
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"block_size":-1}';
+--error 1030
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"block_size":1048577}';
+## misspelling of block size
+--error 1030
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"ablock_size":65536}';
+--error 1030
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"ablock_sizea":65536}';
+## right engine attribute data format
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"block_size":4096}';
+DROP TABLE t1;
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"block_size":8192}';
+DROP TABLE t1;
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"block_size":16384}';
+DROP TABLE t1;
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"block_size":32768}';
+DROP TABLE t1;
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"block_size":65536}';
+DROP TABLE t1;
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"block_size":131072}';
+DROP TABLE t1;
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"block_size":262144}';
+DROP TABLE t1;
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"block_size":524288}';
+DROP TABLE t1;
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"block_size":1048576}';
+DROP TABLE t1;
+## case insensitive
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"BLOCK_SIZE":32768}';
+DROP TABLE t1;
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"Block_size":32768}';
+DROP TABLE t1;
+
+#### engine attribute: bloom_filter ####
+## wrong bloom filter value type
+--error 1030
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"bloom_filter":"ppl"}';
+## misspelling of bloom_filter
+--error 1030
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"abloom_filter":true}';
+--error 1030
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"bloom_filtera":true}';
+## right engine attribute bloom filter
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"bloom_filter":true}';
+DROP TABLE t1;
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"bloom_filter":false}';
+DROP TABLE t1;
+## case insensitive
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"BLOOM_FILTER":false}';
+DROP TABLE t1;
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"Bloom_filter":false}';
+DROP TABLE t1;
+
+## wrong compression value type
+--error 1030
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"compression":1234}';
+## unsupported compression type
+--error 1030
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"compression":"summer"}';
+## misspelling of compression
+--error 1030
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"acompression":"kZSTD"}';
+--error 1030
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"compressiona":"kZSTD,kZSTD"}';
+## wrong value format
+--error 1030
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"compressiona":"kZSTD"}';
+## right engine attribute compression
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"compression":"kZSTD"}';
+DROP TABLE t1;
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"compression":"kZSTD:kZSTD"}';
+DROP TABLE t1;
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"compression":"kZSTD:kZSTD:kZSTD"}';
+DROP TABLE t1;
+## case insensitive
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"COMPRESSION":"kZSTD:kZSTD"}';
+DROP TABLE t1;
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"Compression":"kZSTD:kZSTD"}';
+DROP TABLE t1;
+
+##### ALTER ENGINE ATTRIBUTE #####
+CREATE TABLE t1 (
+  c1 int primary key,
+  c2 int,
+  c3 int,
+  index c2_index(c2)) engine = SMARTENGINE,
+  engine_attribute='{"data_format":"row", "block_size":16384, "bloom_filter":true, "Compression":"kZSTD:kZSTD"}';
+SHOW CREATE TABLE t1;
+
+--disable_query_log
+let $i=1;
+while ($i < 10000)
+{
+  inc $i;
+  eval INSERT INTO t1 VALUES ($i, $i, $i);
+}
+--enable_query_log
+
+SELECT COUNT(*) FROM t1;
+SELECT SUM(c1), SUM(c2), SUM(c3) FROM t1;
+
+SET GLOBAL smartengine_flush_memtable=ON;
+SELECT COUNT(*) FROM t1;
+SELECT SUM(c1), SUM(c2), SUM(c3) FROM t1;
+
+## get index id
+--let $origin_index_id = query_get_value(SELECT subtable_id FROM INFORMATION_SCHEMA.SMARTENGINE_SUBTABLE WHERE TABLE_NAME LIKE '%t1%' and SUBTABLE_NAME = "PRIMARY", subtable_id, 1)
+
+## alter data format
+ALTER TABLE t1 ENGINE_ATTRIBUTE='{"data_format":"columnar", "block_size":16384, "bloom_filter":true, "Compression":"kZSTD:kZSTD"}';
+SELECT COUNT(*) FROM t1;
+SELECT SUM(c1), SUM(c2), SUM(c3) FROM t1;
+
+## get index id
+--let $index_id = query_get_value(SELECT subtable_id FROM INFORMATION_SCHEMA.SMARTENGINE_SUBTABLE WHERE TABLE_NAME LIKE '%t1%' and SUBTABLE_NAME = "PRIMARY", subtable_id, 1)
+
+if ($origin_index_id == $index_id)
+{
+--echo index id not change
+}
+
+DROP TABLE t1;
+--source suite/smartengine/include/check_smartengine_log_error.inc

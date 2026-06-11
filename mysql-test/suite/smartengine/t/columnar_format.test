@@ -1,0 +1,64 @@
+--source suite/smartengine/include/have_smartengine.inc
+
+--disable_warnings
+DROP TABLE IF EXISTS t1;
+DROP TABLE IF EXISTS t2;
+--enable_warnings
+
+CREATE TABLE t1 (
+  c1 int primary key,
+  c2 char(100),
+  c3 varchar(256),
+  c4 blob
+) ENGINE=SMARTENGINE;
+
+CREATE TABLE t2 (
+  c1 int primary key,
+  c2 char(100),
+  c3 varchar(256),
+  c4 blob
+) ENGINE=SMARTENGINE, ENGINE_ATTRIBUTE='{"data_format":"columnar", "block_size":8192}';
+
+--disable_query_log
+let $i=1;
+while ($i < 10000)
+{
+  eval INSERT INTO t1 VALUES ($i, "zds", "ppl", "summer");
+  eval INSERT INTO t2 VALUES ($i, "zds", "ppl", "summer");
+  inc $i;
+}
+--enable_query_log
+
+SELECT COUNT(*) FROM t1;
+SELECT COUNT(*) FROM t2;
+
+SET GLOBAL smartengine_flush_memtable=ON;
+--exec echo "restart" > $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
+
+SELECT COUNT(*) FROM t1;
+SELECT COUNT(*) FROM t2;
+SELECT COUNT(*) FROM t1 WHERE c2 = "zds";
+SELECT COUNT(*) FROM t2 WHERE c2 = "zds";
+SELECT COUNT(*) FROM t1 WHERE c3 = "ppl";
+SELECT COUNT(*) FROM t2 WHERE c3 = "ppl";
+SELECT COUNT(*) FROM t1 WHERE c4 = "summer";
+SELECT COUNT(*) FROM t2 WHERE c4 = "summer";
+
+ALTER TABLE t1 add column c5 int default 100 , algorithm=instant;
+ALTER TABLE t2 add column c5 int default 100 , algorithm=instant;
+
+INSERT INTO t1 values (10000, "zds", "ppl", "summer", 1234);
+INSERT INTO t2 values (10000, "zds", "ppl", "summer", 1234);
+
+SET GLOBAL smartengine_flush_memtable=ON;
+--exec echo "restart" > $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
+
+SELECT COUNT(*) FROM t1 WHERE c5 = 100;
+SELECT COUNT(*) FROM t1 WHERE c5 = 100;
+
+SELECT * FROM t1 WHERE c5 = 1234;
+SELECT * FROM t2 WHERE c5 = 1234;
+
+DROP TABLE t1;
+DROP TABLE t2;
+--source suite/smartengine/include/check_smartengine_log_error.inc

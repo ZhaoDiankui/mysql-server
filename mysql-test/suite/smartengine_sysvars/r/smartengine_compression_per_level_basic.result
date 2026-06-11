@@ -1,0 +1,7 @@
+SET @start_global_value = @@global.SMARTENGINE_COMPRESSION_PER_LEVEL;
+SELECT @start_global_value;
+@start_global_value
+kNoCompression
+"Trying to set variable @@global.SMARTENGINE_COMPRESSION_PER_LEVEL to 444. It should fail because it is readonly."
+SET @@global.SMARTENGINE_COMPRESSION_PER_LEVEL   = 444;
+ERROR HY000: Variable 'smartengine_compression_per_level' is a read only variable

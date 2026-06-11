@@ -1,0 +1,23 @@
+--source suite/smartengine/include/have_smartengine.inc
+
+--disable_warnings
+DROP DATABASE IF EXISTS smartengine_compaction_stats_test;
+--enable_warnings
+
+CREATE DATABASE smartengine_compaction_stats_test;
+USE smartengine_compaction_stats_test;
+CREATE TABLE t1(c1 int primary key, c2 int) ENGINE=SMARTENGINE;
+
+INSERT INTO t1 values (1, 1);
+
+set global smartengine_flush_memtable = on;
+
+let $id = `select SUBTABLE_ID from information_schema.smartengine_subtable where table_name='smartengine_compaction_stats_test.t1'`;
+
+--disable_query_log
+eval select level, type from information_schema.smartengine_compaction_stats where subtable_id=$id;
+--enable_query_log
+
+DROP DATABASE smartengine_compaction_stats_test;
+--source suite/smartengine/include/check_smartengine_log_error.inc
+

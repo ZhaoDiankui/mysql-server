@@ -1,0 +1,128 @@
+DROP TABLE IF EXISTS t1;
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE;
+DROP TABLE t1;
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{abc}';
+ERROR HY000: Invalid json attribute, error: "Missing a name for object member." at pos 1: 'abc}'
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"abc":1}';
+ERROR HY000: Got error 122 - 'Internal (unspecified) error in handler' from storage engine
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"data_format":1}';
+ERROR HY000: Got error 122 - 'Internal (unspecified) error in handler' from storage engine
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"data_format":"ppl"}';
+ERROR HY000: Got error 122 - 'Internal (unspecified) error in handler' from storage engine
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"adata_format":"row"}';
+ERROR HY000: Got error 122 - 'Internal (unspecified) error in handler' from storage engine
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"data_formata":"row"}';
+ERROR HY000: Got error 122 - 'Internal (unspecified) error in handler' from storage engine
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"data_format":"row"}';
+DROP TABLE t1;
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"data_format":"columnar"}';
+DROP TABLE t1;
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"DATA_FORMAT":"ROW"}';
+DROP TABLE t1;
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"data_Format":"Row"}';
+DROP TABLE t1;
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"block_size":"summer"}';
+ERROR HY000: Got error 122 - 'Internal (unspecified) error in handler' from storage engine
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"block_size":0}';
+ERROR HY000: Got error 122 - 'Internal (unspecified) error in handler' from storage engine
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"block_size":-1}';
+ERROR HY000: Got error 122 - 'Internal (unspecified) error in handler' from storage engine
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"block_size":1048577}';
+ERROR HY000: Got error 122 - 'Internal (unspecified) error in handler' from storage engine
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"ablock_size":65536}';
+ERROR HY000: Got error 122 - 'Internal (unspecified) error in handler' from storage engine
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"ablock_sizea":65536}';
+ERROR HY000: Got error 122 - 'Internal (unspecified) error in handler' from storage engine
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"block_size":4096}';
+DROP TABLE t1;
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"block_size":8192}';
+DROP TABLE t1;
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"block_size":16384}';
+DROP TABLE t1;
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"block_size":32768}';
+DROP TABLE t1;
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"block_size":65536}';
+DROP TABLE t1;
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"block_size":131072}';
+DROP TABLE t1;
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"block_size":262144}';
+DROP TABLE t1;
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"block_size":524288}';
+DROP TABLE t1;
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"block_size":1048576}';
+DROP TABLE t1;
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"BLOCK_SIZE":32768}';
+DROP TABLE t1;
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"Block_size":32768}';
+DROP TABLE t1;
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"bloom_filter":"ppl"}';
+ERROR HY000: Got error 122 - 'Internal (unspecified) error in handler' from storage engine
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"abloom_filter":true}';
+ERROR HY000: Got error 122 - 'Internal (unspecified) error in handler' from storage engine
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"bloom_filtera":true}';
+ERROR HY000: Got error 122 - 'Internal (unspecified) error in handler' from storage engine
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"bloom_filter":true}';
+DROP TABLE t1;
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"bloom_filter":false}';
+DROP TABLE t1;
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"BLOOM_FILTER":false}';
+DROP TABLE t1;
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"Bloom_filter":false}';
+DROP TABLE t1;
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"compression":1234}';
+ERROR HY000: Got error 122 - 'Internal (unspecified) error in handler' from storage engine
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"compression":"summer"}';
+ERROR HY000: Got error 122 - 'Internal (unspecified) error in handler' from storage engine
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"acompression":"kZSTD"}';
+ERROR HY000: Got error 122 - 'Internal (unspecified) error in handler' from storage engine
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"compressiona":"kZSTD,kZSTD"}';
+ERROR HY000: Got error 122 - 'Internal (unspecified) error in handler' from storage engine
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"compressiona":"kZSTD"}';
+ERROR HY000: Got error 122 - 'Internal (unspecified) error in handler' from storage engine
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"compression":"kZSTD"}';
+DROP TABLE t1;
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"compression":"kZSTD:kZSTD"}';
+DROP TABLE t1;
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"compression":"kZSTD:kZSTD:kZSTD"}';
+DROP TABLE t1;
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"COMPRESSION":"kZSTD:kZSTD"}';
+DROP TABLE t1;
+CREATE TABLE t1 (c1 int primary key, c2 int, c3 int, index c2_index(c2)) engine = SMARTENGINE, engine_attribute='{"Compression":"kZSTD:kZSTD"}';
+DROP TABLE t1;
+CREATE TABLE t1 (
+c1 int primary key,
+c2 int,
+c3 int,
+index c2_index(c2)) engine = SMARTENGINE,
+engine_attribute='{"data_format":"row", "block_size":16384, "bloom_filter":true, "Compression":"kZSTD:kZSTD"}';
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `c1` int NOT NULL,
+  `c2` int DEFAULT NULL,
+  `c3` int DEFAULT NULL,
+  PRIMARY KEY (`c1`),
+  KEY `c2_index` (`c2`)
+) ENGINE=SMARTENGINE DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci /*!80021 ENGINE_ATTRIBUTE='{"block_size": 16384, "Compression": "kZSTD:kZSTD", "data_format": "row", "bloom_filter": true}' */
+SELECT COUNT(*) FROM t1;
+COUNT(*)
+9999
+SELECT SUM(c1), SUM(c2), SUM(c3) FROM t1;
+SUM(c1)	SUM(c2)	SUM(c3)
+50004999	50004999	50004999
+SET GLOBAL smartengine_flush_memtable=ON;
+SELECT COUNT(*) FROM t1;
+COUNT(*)
+9999
+SELECT SUM(c1), SUM(c2), SUM(c3) FROM t1;
+SUM(c1)	SUM(c2)	SUM(c3)
+50004999	50004999	50004999
+ALTER TABLE t1 ENGINE_ATTRIBUTE='{"data_format":"columnar", "block_size":16384, "bloom_filter":true, "Compression":"kZSTD:kZSTD"}';
+SELECT COUNT(*) FROM t1;
+COUNT(*)
+9999
+SELECT SUM(c1), SUM(c2), SUM(c3) FROM t1;
+SUM(c1)	SUM(c2)	SUM(c3)
+50004999	50004999	50004999
+index id not change
+DROP TABLE t1;

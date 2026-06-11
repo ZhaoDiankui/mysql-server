@@ -1,0 +1,67 @@
+# Daily suite - Collection of tests that are run daily.
+# Runs overnight and should finish in under 8 hours.
+# Runs all suites with    and without --debug-server.
+# Runs rpl, binlog and innodb suites with some additional mysqld options
+# passed on command line.
+
+# NOTE : DO NOT ADD "--debug-server" OPTION  TO THE MTR
+# COMMAND LINES IN  default.daily
+# NOTE : ALL COMMAND LINES ADDED TO "default.daily"
+# SHOULD BE ALSO ADDED TO default.weekly WITH "--debug-server" OPTION
+# Daily is not run on debug build because they cannot finish in under 8 hours
+# Weekly runs against debug and runs all tests that are run in deaily
+#
+
+#### SECTION 1: RUN DEFAULT SUITES##############
+# Add all combinations with default suites in this section
+#
+# Run all default suites
+# rpl and binlog suites run with all 3
+# binlog-formats  row, stmt and mixed
+# Run with  --big-test option so that longer tests are also run
+#################SECTION2: RUN SUITES THAT ARE NOT PART OF DEFAULT##########
+# Run the suites that are not part of the default - funcs_2, stress, jp, nist
+# engines, memcached, audit_null
+date
+perl mysql-test-run.pl --force --timer    --testcase-timeout=60  --retry=0  --nowarnings --comment=audit_null --vardir=var-audit_null  --suite=audit_null
+perl mysql-test-run.pl --force --timer    --testcase-timeout=60  --retry=0  --nowarnings  --comment=auth_sec --vardir=var-auth_sec  --suite=auth_sec
+perl mysql-test-run.pl --force --timer    --testcase-timeout=60  --retry=0  --nowarnings  --comment=binlog --vardir=var-binlog  --suite=binlog
+perl mysql-test-run.pl --force --timer    --testcase-timeout=60  --retry=0  --nowarnings  --comment=binlog_gtid --vardir=var-binlog_gtid  --suite=binlog_gtid
+perl mysql-test-run.pl --force --timer    --testcase-timeout=60  --retry=0  --nowarnings  --comment=binlog_nogtid --vardir=var-binlog_nogtid  --suite=binlog_nogtid
+perl mysql-test-run.pl --force --timer    --testcase-timeout=60  --retry=0  --nowarnings  --comment=collations --vardir=var-collations  --suite=collations
+perl mysql-test-run.pl --force --timer    --testcase-timeout=60  --retry=0  --nowarnings  --comment=component_keyring_file --vardir=var-component_keyring_file  --suite=component_keyring_file
+perl mysql-test-run.pl --force --timer    --testcase-timeout=60  --retry=0  --nowarnings  --comment=connection_control --vardir=var-connection_control  --suite=connection_control
+perl mysql-test-run.pl --force --timer    --testcase-timeout=60  --retry=0  --nowarnings --comment=encryption --vardir=var-encryption  --suite=encryption
+perl mysql-test-run.pl --force --timer    --testcase-timeout=60  --retry=0  --nowarnings  --comment=funcs1 --vardir=var-funcs1  --suite=funcs_1
+perl mysql-test-run.pl --force --timer    --testcase-timeout=60  --retry=0  --nowarnings  --comment=funcs2 --vardir=var-funcs2  --suite=funcs_2
+perl mysql-test-run.pl --force --timer    --testcase-timeout=60  --retry=0  --nowarnings  --comment=gcol --vardir=var-gcol  --suite=gcol
+perl mysql-test-run.pl --force --timer    --testcase-timeout=60  --retry=0  --nowarnings  --comment=gis --vardir=var-gis  --suite=gis
+perl mysql-test-run.pl --force --timer    --testcase-timeout=60  --retry=0  --nowarnings  --comment=information_schema --vardir=var-information_schema  --suite=information_schema
+perl mysql-test-run.pl --force --timer    --testcase-timeout=60  --retry=0  --nowarnings  --comment=innodb_fts --vardir=var-innodb_fts  --suite=innodb_fts
+perl mysql-test-run.pl --force --timer    --testcase-timeout=60  --retry=0  --nowarnings  --comment=innodb_gis --vardir=var-innodb_gis  --suite=innodb_gis
+perl mysql-test-run.pl --force --timer    --testcase-timeout=60  --retry=0  --nowarnings  --comment=innodb_undo --vardir=var-innodb_undo  --suite=innodb_undo
+perl mysql-test-run.pl --force --timer    --testcase-timeout=60  --retry=0  --nowarnings  --comment=innodb_zip --vardir=var-innodb_zip  --suite=innodb_zip
+perl mysql-test-run.pl --force --timer    --testcase-timeout=60  --retry=0  --nowarnings --comment=jp --vardir=var-jp --suite=jp
+perl mysql-test-run.pl --force --timer    --testcase-timeout=60  --retry=0  --nowarnings --comment=json --vardir=var-json --suite=json
+perl mysql-test-run.pl --force --timer    --testcase-timeout=60  --retry=0  --nowarnings  --comment=large_tests --vardir=var-large_tests --suite=large_tests
+perl mysql-test-run.pl --force --timer    --testcase-timeout=60  --retry=0  --nowarnings --comment=memcached --vardir=var-memcached --suite=memcached
+perl mysql-test-run.pl --force --timer    --testcase-timeout=60  --retry=0  --nowarnings  --comment=opt_trace --vardir=var-opt_trace --suite=opt_trace
+perl mysql-test-run.pl --force --timer    --testcase-timeout=60  --retry=0  --nowarnings --comment=parts --vardir=var-parts --suite=parts
+perl mysql-test-run.pl --force --timer    --testcase-timeout=60  --retry=0  --nowarnings --comment=perfschema --vardir=var-perfschema --suite=perfschema
+perl mysql-test-run.pl --force --timer    --testcase-timeout=60  --retry=0  --nowarnings --comment=query_rewrite_plugins --vardir=var-query_rewrite_plugins --suite=query_rewrite_plugins
+perl mysql-test-run.pl --force --timer    --testcase-timeout=60  --retry=0  --nowarnings --comment=secondary_engine --vardir=var-secondary_engine --suite=secondary_engine
+perl mysql-test-run.pl --force --timer    --testcase-timeout=60  --retry=0  --nowarnings --comment=service_status_var_registration --vardir=var-service_status_var_registration --suite=service_status_var_registration
+perl mysql-test-run.pl --force --timer    --testcase-timeout=60  --retry=0  --nowarnings --comment=service_sys_var_registration --vardir=var-service_sys_var_registration --suite=service_sys_var_registration
+perl mysql-test-run.pl --force --timer    --testcase-timeout=60  --retry=0  --nowarnings --comment=service_udf_registration --vardir=var-service_udf_registration --suite=service_udf_registration
+perl mysql-test-run.pl --force --timer    --testcase-timeout=60  --retry=0  --nowarnings --comment=stress --vardir=var-stress --suite=stress
+perl mysql-test-run.pl --force --timer    --testcase-timeout=60  --retry=0  --nowarnings --comment=sysschema --vardir=var-sysschema --suite=sysschema
+perl mysql-test-run.pl --force --timer    --testcase-timeout=60  --retry=0  --nowarnings --comment=sys_vars --vardir=var-sys_vars --suite=sys_vars
+perl mysql-test-run.pl --force --timer    --testcase-timeout=60  --retry=0  --nowarnings --comment=test_services --vardir=var-test_services --suite=test_services
+perl mysql-test-run.pl --force --timer    --testcase-timeout=60  --retry=0  --nowarnings --comment=test_service_sql_api --vardir=var-test_service_sql_api --suite=test_service_sql_api
+perl mysql-test-run.pl --force --timer    --testcase-timeout=60  --retry=0  --nowarnings --comment=wesql --vardir=var-wesql --suite=wesql
+perl mysql-test-run.pl --force --timer    --testcase-timeout=60  --retry=0  --nowarnings --comment=x --vardir=var-x --suite=x
+perl mysql-test-run.pl --force --timer    --testcase-timeout=60  --retry=0  --nowarnings --comment=raft_replication --vardir=var-raft_replication --suite=raft_replication
+perl mysql-test-run.pl --force --timer    --testcase-timeout=60  --retry=0  --nowarnings  --comment=innodb --vardir=var-innodb  --suite=innodb
+perl mysql-test-run.pl --force --timer    --testcase-timeout=60  --retry=0  --nowarnings --comment=max_parts --vardir=var-max_parts --suite=max_parts
+perl mysql-test-run.pl --force --timer    --testcase-timeout=60  --retry=0  --nowarnings --comment=main --suite=main --vardir=var-main
+date

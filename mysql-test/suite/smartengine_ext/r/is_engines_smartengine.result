@@ -1,0 +1,8 @@
+SELECT * FROM information_schema.engines
+WHERE ENGINE = 'SMARTENGINE';
+ENGINE	SMARTENGINE
+SUPPORT	DEFAULT
+COMMENT	High-compression, supports transactions
+TRANSACTIONS	YES
+XA	YES
+SAVEPOINTS	YES

@@ -1,0 +1,5 @@
+--source suite/smartengine/include/have_smartengine.inc
+
+create table t (id int primary key) ENGINE = SMARTENGINE;
+drop table t;
+--source suite/smartengine/include/check_smartengine_log_error.inc

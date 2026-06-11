@@ -1,0 +1,9 @@
+--source suite/smartengine/include/have_smartengine.inc
+
+#
+# INT column types
+#
+
+--source type_int.inc
+
+--source suite/smartengine/include/check_smartengine_log_error.inc

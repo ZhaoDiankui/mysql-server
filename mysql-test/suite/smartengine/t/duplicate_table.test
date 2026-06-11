@@ -1,0 +1,11 @@
+--source suite/smartengine/include/have_smartengine.inc
+--disable_warnings
+DROP TABLE IF EXISTS t;
+--enable_warnings
+CREATE TABLE t(id int primary key) ENGINE = SMARTENGINE;
+INSERT INTO t values (1), (2), (3);
+--error ER_TABLE_EXISTS_ERROR
+CREATE TABLE t(id int primary key) ENGINE = SMARTENGINE;
+SELECT * FROM t;
+DROP TABLE t;
+--source suite/smartengine/include/check_smartengine_log_error.inc

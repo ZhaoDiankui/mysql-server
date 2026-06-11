@@ -1,0 +1,6 @@
+--source suite/smartengine/include/have_smartengine.inc
+
+-- let $truncate_table = 1
+-- let $drop_table = 0
+-- source drop_table3.inc
+--source suite/smartengine/include/check_smartengine_log_error.inc

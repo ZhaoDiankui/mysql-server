@@ -1,0 +1,2 @@
+--source suite/smartengine/t/smartengine_deadlock_detect.inc
+--source suite/smartengine/include/check_smartengine_log_error.inc

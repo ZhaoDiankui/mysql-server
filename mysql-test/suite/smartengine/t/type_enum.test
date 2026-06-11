@@ -1,0 +1,9 @@
+--source suite/smartengine/include/have_smartengine.inc
+
+#
+# ENUM column type
+#
+
+--source type_enum.inc
+
+--source suite/smartengine/include/check_smartengine_log_error.inc

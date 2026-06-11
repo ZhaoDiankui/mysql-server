@@ -1,0 +1,190 @@
+include/master-slave.inc
+Warnings:
+Note	####	Sending passwords in plain text without SSL/TLS is extremely insecure.
+Note	####	Storing MySQL user name or password information in the connection metadata repository is not secure and is therefore not recommended. Please consider using the USER and PASSWORD connection options for START REPLICA; see the 'START REPLICA Syntax' in the MySQL Manual for more information.
+[connection master]
+
+Create a replication user to use in change master tests.
+
+CREATE USER replssl@localhost REQUIRE SSL;
+GRANT REPLICATION SLAVE ON *.* TO replssl@localhost;
+include/sync_slave_sql_with_master.inc
+
+With both receiver and applier stopped, all CHANGE MASTER options should
+be allowed.
+
+include/stop_slave.inc
+CHANGE MASTER TO MASTER_AUTO_POSITION= 0;
+Warnings:
+Warning	1287	'CHANGE MASTER' is deprecated and will be removed in a future release. Please use CHANGE REPLICATION SOURCE instead
+Warning	1287	'MASTER_AUTO_POSITION' is deprecated and will be removed in a future release. Please use SOURCE_AUTO_POSITION instead
+Warnings:
+Warning	####	'CHANGE MASTER' is deprecated and will be removed in a future release. Please use CHANGE REPLICATION SOURCE instead
+Warning	####	'MASTER_HOST' is deprecated and will be removed in a future release. Please use SOURCE_HOST instead
+Warning	####	'MASTER_USER' is deprecated and will be removed in a future release. Please use SOURCE_USER instead
+Warning	####	'MASTER_PASSWORD' is deprecated and will be removed in a future release. Please use SOURCE_PASSWORD instead
+Warning	####	'MASTER_PORT' is deprecated and will be removed in a future release. Please use SOURCE_PORT instead
+Warning	####	'MASTER_CONNECT_RETRY' is deprecated and will be removed in a future release. Please use SOURCE_CONNECT_RETRY instead
+Warning	####	'MASTER_RETRY_COUNT' is deprecated and will be removed in a future release. Please use SOURCE_RETRY_COUNT instead
+Warning	####	'MASTER_DELAY' is deprecated and will be removed in a future release. Please use SOURCE_DELAY instead
+Warning	####	'MASTER_LOG_FILE' is deprecated and will be removed in a future release. Please use SOURCE_LOG_FILE instead
+Warning	####	'MASTER_LOG_POS' is deprecated and will be removed in a future release. Please use SOURCE_LOG_POS instead
+Warning	####	'MASTER_HEARTBEAT_PERIOD' is deprecated and will be removed in a future release. Please use SOURCE_HEARTBEAT_PERIOD instead
+Warning	####	'MASTER_AUTO_POSITION' is deprecated and will be removed in a future release. Please use SOURCE_AUTO_POSITION instead
+Warning	####	'MASTER_SSL' is deprecated and will be removed in a future release. Please use SOURCE_SSL instead
+Warning	####	'MASTER_SSL_CA' is deprecated and will be removed in a future release. Please use SOURCE_SSL_CA instead
+Warning	####	'MASTER_SSL_CERT' is deprecated and will be removed in a future release. Please use SOURCE_SSL_CERT instead
+Warning	####	'MASTER_SSL_KEY' is deprecated and will be removed in a future release. Please use SOURCE_SSL_KEY instead
+Warning	####	'MASTER_SSL_VERIFY_SERVER_CERT' is deprecated and will be removed in a future release. Please use SOURCE_SSL_VERIFY_SERVER_CERT instead
+Note	####	Sending passwords in plain text without SSL/TLS is extremely insecure.
+Note	####	Storing MySQL user name or password information in the connection metadata repository is not secure and is therefore not recommended. Please consider using the USER and PASSWORD connection options for START REPLICA; see the 'START REPLICA Syntax' in the MySQL Manual for more information.
+Warning	####	'CHANGE MASTER TO ... IGNORE_SERVER_IDS='...' (when @@GLOBAL.GTID_MODE = ON)' is deprecated and will be removed in a future release.
+CHANGE MASTER TO RELAY_LOG_FILE= 'RELAY_LOG_FILE';
+Warnings:
+Warning	1287	'CHANGE MASTER' is deprecated and will be removed in a future release. Please use CHANGE REPLICATION SOURCE instead
+CHANGE MASTER TO RELAY_LOG_POS= RELAY_LOG_POS;
+Warnings:
+Warning	1287	'CHANGE MASTER' is deprecated and will be removed in a future release. Please use CHANGE REPLICATION SOURCE instead
+CHANGE MASTER TO MASTER_AUTO_POSITION= 1;
+Warnings:
+Warning	1287	'CHANGE MASTER' is deprecated and will be removed in a future release. Please use CHANGE REPLICATION SOURCE instead
+Warning	1287	'MASTER_AUTO_POSITION' is deprecated and will be removed in a future release. Please use SOURCE_AUTO_POSITION instead
+CHANGE MASTER TO MASTER_AUTO_POSITION= 0;
+Warnings:
+Warning	1287	'CHANGE MASTER' is deprecated and will be removed in a future release. Please use CHANGE REPLICATION SOURCE instead
+Warning	1287	'MASTER_AUTO_POSITION' is deprecated and will be removed in a future release. Please use SOURCE_AUTO_POSITION instead
+
+With receiver stopped and applier running, we should be able to change
+receiver options. Setting applier options should throw the correct error
+message.
+
+include/start_slave_sql.inc
+Warnings:
+Warning	####	'CHANGE MASTER' is deprecated and will be removed in a future release. Please use CHANGE REPLICATION SOURCE instead
+Warning	####	'MASTER_HOST' is deprecated and will be removed in a future release. Please use SOURCE_HOST instead
+Warning	####	'MASTER_USER' is deprecated and will be removed in a future release. Please use SOURCE_USER instead
+Warning	####	'MASTER_PASSWORD' is deprecated and will be removed in a future release. Please use SOURCE_PASSWORD instead
+Warning	####	'MASTER_PORT' is deprecated and will be removed in a future release. Please use SOURCE_PORT instead
+Warning	####	'MASTER_CONNECT_RETRY' is deprecated and will be removed in a future release. Please use SOURCE_CONNECT_RETRY instead
+Warning	####	'MASTER_RETRY_COUNT' is deprecated and will be removed in a future release. Please use SOURCE_RETRY_COUNT instead
+Warning	####	'MASTER_LOG_FILE' is deprecated and will be removed in a future release. Please use SOURCE_LOG_FILE instead
+Warning	####	'MASTER_LOG_POS' is deprecated and will be removed in a future release. Please use SOURCE_LOG_POS instead
+Warning	####	'MASTER_HEARTBEAT_PERIOD' is deprecated and will be removed in a future release. Please use SOURCE_HEARTBEAT_PERIOD instead
+Warning	####	'MASTER_SSL' is deprecated and will be removed in a future release. Please use SOURCE_SSL instead
+Warning	####	'MASTER_SSL_CA' is deprecated and will be removed in a future release. Please use SOURCE_SSL_CA instead
+Warning	####	'MASTER_SSL_CERT' is deprecated and will be removed in a future release. Please use SOURCE_SSL_CERT instead
+Warning	####	'MASTER_SSL_KEY' is deprecated and will be removed in a future release. Please use SOURCE_SSL_KEY instead
+Warning	####	'MASTER_SSL_VERIFY_SERVER_CERT' is deprecated and will be removed in a future release. Please use SOURCE_SSL_VERIFY_SERVER_CERT instead
+Note	####	Sending passwords in plain text without SSL/TLS is extremely insecure.
+Note	####	Storing MySQL user name or password information in the connection metadata repository is not secure and is therefore not recommended. Please consider using the USER and PASSWORD connection options for START REPLICA; see the 'START REPLICA Syntax' in the MySQL Manual for more information.
+Warning	####	'CHANGE MASTER TO ... IGNORE_SERVER_IDS='...' (when @@GLOBAL.GTID_MODE = ON)' is deprecated and will be removed in a future release.
+CHANGE MASTER TO MASTER_AUTO_POSITION= 1;
+ERROR HY000: This operation cannot be performed with running replication threads; run STOP REPLICA FOR CHANNEL '' first
+CHANGE MASTER TO RELAY_LOG_FILE= 'RELAY_LOG_FILE';
+ERROR HY000: This operation cannot be performed with a running replica sql thread; run STOP REPLICA SQL_THREAD FOR CHANNEL '' first.
+CHANGE MASTER TO RELAY_LOG_POS= RELAY_LOG_POS;
+ERROR HY000: This operation cannot be performed with a running replica sql thread; run STOP REPLICA SQL_THREAD FOR CHANNEL '' first.
+CHANGE MASTER TO MASTER_DELAY= 10;
+ERROR HY000: This operation cannot be performed with a running replica sql thread; run STOP REPLICA SQL_THREAD FOR CHANNEL '' first.
+CHANGE MASTER TO MASTER_RETRY_COUNT= 1, RELAY_LOG_FILE= 'RELAY_LOG_FILE';
+ERROR HY000: This operation cannot be performed with a running replica sql thread; run STOP REPLICA SQL_THREAD FOR CHANNEL '' first.
+CHANGE MASTER TO MASTER_RETRY_COUNT= 1, RELAY_LOG_POS= RELAY_LOG_POS;
+ERROR HY000: This operation cannot be performed with a running replica sql thread; run STOP REPLICA SQL_THREAD FOR CHANNEL '' first.
+CHANGE MASTER TO MASTER_RETRY_COUNT= 1, MASTER_DELAY=10;
+ERROR HY000: This operation cannot be performed with a running replica sql thread; run STOP REPLICA SQL_THREAD FOR CHANNEL '' first.
+
+With applier stopped and receiver running, we should be able to change
+applier options. Setting receiver options should throw the correct error
+message.
+
+include/stop_slave_sql.inc
+include/start_slave_io.inc
+CHANGE MASTER TO RELAY_LOG_FILE= 'RELAY_LOG_FILE';
+Warnings:
+Warning	1287	'CHANGE MASTER' is deprecated and will be removed in a future release. Please use CHANGE REPLICATION SOURCE instead
+CHANGE MASTER TO RELAY_LOG_POS= RELAY_LOG_POS;
+Warnings:
+Warning	1287	'CHANGE MASTER' is deprecated and will be removed in a future release. Please use CHANGE REPLICATION SOURCE instead
+CHANGE MASTER TO MASTER_DELAY= 10;
+Warnings:
+Warning	1287	'CHANGE MASTER' is deprecated and will be removed in a future release. Please use CHANGE REPLICATION SOURCE instead
+Warning	1287	'MASTER_DELAY' is deprecated and will be removed in a future release. Please use SOURCE_DELAY instead
+CHANGE MASTER TO MASTER_AUTO_POSITION= 1;
+ERROR HY000: This operation cannot be performed with running replication threads; run STOP REPLICA FOR CHANNEL '' first
+CHANGE MASTER TO MASTER_HOST= 'localhost';
+ERROR HY000: This operation cannot be performed with a running replica io thread; run STOP REPLICA IO_THREAD FOR CHANNEL '' first.
+CHANGE MASTER TO MASTER_USER= 'replssl';
+ERROR HY000: This operation cannot be performed with a running replica io thread; run STOP REPLICA IO_THREAD FOR CHANNEL '' first.
+CHANGE MASTER TO  MASTER_PASSWORD= '';
+ERROR HY000: This operation cannot be performed with a running replica io thread; run STOP REPLICA IO_THREAD FOR CHANNEL '' first.
+ERROR HY000: This operation cannot be performed with a running replica io thread; run STOP REPLICA IO_THREAD FOR CHANNEL '' first.
+CHANGE MASTER TO MASTER_CONNECT_RETRY= 20;
+ERROR HY000: This operation cannot be performed with a running replica io thread; run STOP REPLICA IO_THREAD FOR CHANNEL '' first.
+CHANGE MASTER TO MASTER_RETRY_COUNT= 1;
+ERROR HY000: This operation cannot be performed with a running replica io thread; run STOP REPLICA IO_THREAD FOR CHANNEL '' first.
+ERROR HY000: This operation cannot be performed with a running replica io thread; run STOP REPLICA IO_THREAD FOR CHANNEL '' first.
+ERROR HY000: This operation cannot be performed with a running replica io thread; run STOP REPLICA IO_THREAD FOR CHANNEL '' first.
+CHANGE MASTER TO MASTER_HEARTBEAT_PERIOD= 20;
+ERROR HY000: This operation cannot be performed with a running replica io thread; run STOP REPLICA IO_THREAD FOR CHANNEL '' first.
+CHANGE MASTER TO MASTER_SSL= 1;
+ERROR HY000: This operation cannot be performed with a running replica io thread; run STOP REPLICA IO_THREAD FOR CHANNEL '' first.
+ERROR HY000: This operation cannot be performed with a running replica io thread; run STOP REPLICA IO_THREAD FOR CHANNEL '' first.
+ERROR HY000: This operation cannot be performed with a running replica io thread; run STOP REPLICA IO_THREAD FOR CHANNEL '' first.
+ERROR HY000: This operation cannot be performed with a running replica io thread; run STOP REPLICA IO_THREAD FOR CHANNEL '' first.
+CHANGE MASTER TO MASTER_SSL_VERIFY_SERVER_CERT= 1;
+ERROR HY000: This operation cannot be performed with a running replica io thread; run STOP REPLICA IO_THREAD FOR CHANNEL '' first.
+CHANGE MASTER TO MASTER_DELAY=10, MASTER_HOST= 'localhost';
+ERROR HY000: This operation cannot be performed with a running replica io thread; run STOP REPLICA IO_THREAD FOR CHANNEL '' first.
+CHANGE MASTER TO MASTER_DELAY=10, MASTER_USER= 'replssl';
+ERROR HY000: This operation cannot be performed with a running replica io thread; run STOP REPLICA IO_THREAD FOR CHANNEL '' first.
+CHANGE MASTER TO MASTER_DELAY=10, MASTER_PASSWORD= '';
+ERROR HY000: This operation cannot be performed with a running replica io thread; run STOP REPLICA IO_THREAD FOR CHANNEL '' first.
+ERROR HY000: This operation cannot be performed with a running replica io thread; run STOP REPLICA IO_THREAD FOR CHANNEL '' first.
+CHANGE MASTER TO MASTER_DELAY=10, MASTER_CONNECT_RETRY= 20;
+ERROR HY000: This operation cannot be performed with a running replica io thread; run STOP REPLICA IO_THREAD FOR CHANNEL '' first.
+CHANGE MASTER TO MASTER_DELAY=10, MASTER_RETRY_COUNT= 1;
+ERROR HY000: This operation cannot be performed with a running replica io thread; run STOP REPLICA IO_THREAD FOR CHANNEL '' first.
+ERROR HY000: This operation cannot be performed with a running replica io thread; run STOP REPLICA IO_THREAD FOR CHANNEL '' first.
+ERROR HY000: This operation cannot be performed with a running replica io thread; run STOP REPLICA IO_THREAD FOR CHANNEL '' first.
+CHANGE MASTER TO MASTER_DELAY= 10, MASTER_HEARTBEAT_PERIOD= 20;
+ERROR HY000: This operation cannot be performed with a running replica io thread; run STOP REPLICA IO_THREAD FOR CHANNEL '' first.
+CHANGE MASTER TO MASTER_DELAY=10, MASTER_SSL=1;
+ERROR HY000: This operation cannot be performed with a running replica io thread; run STOP REPLICA IO_THREAD FOR CHANNEL '' first.
+ERROR HY000: This operation cannot be performed with a running replica io thread; run STOP REPLICA IO_THREAD FOR CHANNEL '' first.
+ERROR HY000: This operation cannot be performed with a running replica io thread; run STOP REPLICA IO_THREAD FOR CHANNEL '' first.
+ERROR HY000: This operation cannot be performed with a running replica io thread; run STOP REPLICA IO_THREAD FOR CHANNEL '' first.
+CHANGE MASTER TO MASTER_DELAY= 10, MASTER_SSL_VERIFY_SERVER_CERT= 1;
+ERROR HY000: This operation cannot be performed with a running replica io thread; run STOP REPLICA IO_THREAD FOR CHANNEL '' first.
+include/stop_slave.inc
+
+cleanup
+
+CHANGE MASTER TO
+MASTER_HOST= '127.0.0.1',
+MASTER_USER= 'root',
+MASTER_DELAY= 0,
+IGNORE_SERVER_IDS= (),
+MASTER_SSL= 0,
+MASTER_SSL_CA= '',
+MASTER_SSL_CERT= '',
+MASTER_SSL_KEY= '',
+MASTER_SSL_VERIFY_SERVER_CERT= 0;
+Warnings:
+Warning	####	'CHANGE MASTER' is deprecated and will be removed in a future release. Please use CHANGE REPLICATION SOURCE instead
+Warning	####	'MASTER_HOST' is deprecated and will be removed in a future release. Please use SOURCE_HOST instead
+Warning	####	'MASTER_USER' is deprecated and will be removed in a future release. Please use SOURCE_USER instead
+Warning	####	'MASTER_DELAY' is deprecated and will be removed in a future release. Please use SOURCE_DELAY instead
+Warning	####	'MASTER_SSL' is deprecated and will be removed in a future release. Please use SOURCE_SSL instead
+Warning	####	'MASTER_SSL_CA' is deprecated and will be removed in a future release. Please use SOURCE_SSL_CA instead
+Warning	####	'MASTER_SSL_CERT' is deprecated and will be removed in a future release. Please use SOURCE_SSL_CERT instead
+Warning	####	'MASTER_SSL_KEY' is deprecated and will be removed in a future release. Please use SOURCE_SSL_KEY instead
+Warning	####	'MASTER_SSL_VERIFY_SERVER_CERT' is deprecated and will be removed in a future release. Please use SOURCE_SSL_VERIFY_SERVER_CERT instead
+Note	####	Sending passwords in plain text without SSL/TLS is extremely insecure.
+Note	####	Storing MySQL user name or password information in the connection metadata repository is not secure and is therefore not recommended. Please consider using the USER and PASSWORD connection options for START REPLICA; see the 'START REPLICA Syntax' in the MySQL Manual for more information.
+CHANGE MASTER TO MASTER_AUTO_POSITION= SAVE_AUTOPOSITION;
+Warnings:
+Warning	SAVE_AUTOPOSITION287	'CHANGE MASTER' is deprecated and will be removed in a future release. Please use CHANGE REPLICATION SOURCE instead
+Warning	SAVE_AUTOPOSITION287	'MASTER_AUTO_POSITION' is deprecated and will be removed in a future release. Please use SOURCE_AUTO_POSITION instead
+include/start_slave.inc
+DROP USER replssl@localhost;
+include/rpl_end.inc

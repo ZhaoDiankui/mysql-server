@@ -1,0 +1,77 @@
+#
+# Test for consistent snapshot from object store
+#
+--echo # Wait for at least 1 snapshots to be generated 
+let $wait_condition= SELECT count(*) >=1 FROM INFORMATION_SCHEMA.SNAPSHOT_PERSISTENT_SNAPSHOT_INDEX;
+--source include/wait_condition_or_abort.inc
+
+CREATE DATABASE db1;
+CREATE TABLE t1(c1 int) ENGINE=SMARTENGINE ;
+INSERT INTO t1 values(1);
+INSERT INTO t1 values(2);
+INSERT INTO t1 values(3);
+INSERT INTO t1 values(4);
+SELECT * FROM t1;
+
+--echo # Wait for at least 2 snapshots to be generated 
+let $wait_condition= SELECT count(*) >=2 FROM INFORMATION_SCHEMA.SNAPSHOT_PERSISTENT_SNAPSHOT_INDEX;
+--source include/wait_condition_or_abort.inc
+
+--echo # Select SNAPSHOT_INNODB_PERSISTENT_SNAPSHOT_INDEX
+SELECT IF(RIGHT(INNODB_SNAPSHOT_NAME, 1) = '/', SUBSTRING_INDEX(SUBSTRING_INDEX(INNODB_SNAPSHOT_NAME, '/', -2), '/', 1), SUBSTRING_INDEX(SUBSTRING_INDEX(INNODB_SNAPSHOT_NAME, '/', -1), '.', 1)) AS name FROM INFORMATION_SCHEMA.SNAPSHOT_INNODB_PERSISTENT_SNAPSHOT_INDEX ORDER BY name limit 2;
+--disable_warnings
+--echo # Select SNAPSHOT_INNODB_PERSISTENT_SNAPSHOTS
+SELECT IF(RIGHT(INNODB_SNAPSHOT_KEY, 1) = '/', SUBSTRING_INDEX(SUBSTRING_INDEX(INNODB_SNAPSHOT_KEY, '/', -2), '/', 1), SUBSTRING_INDEX(SUBSTRING_INDEX(INNODB_SNAPSHOT_KEY, '/', -1), '.', 1)) AS name FROM INFORMATION_SCHEMA.SNAPSHOT_INNODB_PERSISTENT_SNAPSHOTS ORDER BY name limit 2;
+--enable_warnings
+
+--echo # Select SNAPSHOT_SMARTENGINE_PERSISTENT_SNAPSHOT_INDEX
+SELECT IF(RIGHT(SMARTENGINE_SNAPSHOT_NAME, 1) = '/', SUBSTRING_INDEX(SUBSTRING_INDEX(SMARTENGINE_SNAPSHOT_NAME, '/', -2), '/', 1), SUBSTRING_INDEX(SUBSTRING_INDEX(SMARTENGINE_SNAPSHOT_NAME, '/', -1), '.', 1)) AS name FROM INFORMATION_SCHEMA.SNAPSHOT_SMARTENGINE_PERSISTENT_SNAPSHOT_INDEX ORDER BY name limit 2;
+--disable_warnings
+--echo # SNAPSHOT_SMARTENGINE_PERSISTENT_SNAPSHOTS
+SELECT IF(RIGHT(SMARTENGINE_SNAPSHOT_KEY, 1) = '/', SUBSTRING_INDEX(SUBSTRING_INDEX(SMARTENGINE_SNAPSHOT_KEY, '/', -2), '/', 1), SUBSTRING_INDEX(SUBSTRING_INDEX(SMARTENGINE_SNAPSHOT_KEY, '/', -1), '.', 1)) AS name FROM INFORMATION_SCHEMA.SNAPSHOT_SMARTENGINE_PERSISTENT_SNAPSHOTS ORDER BY name limit 2;
+--enable_warnings
+
+INSERT INTO t1 SELECT * FROM t1;
+--echo # Wait for at least 3 snapshots to be generated 
+--let $wait_condition= SELECT count(*) >=3 FROM INFORMATION_SCHEMA.SNAPSHOT_PERSISTENT_SNAPSHOT_INDEX
+--source include/wait_condition_or_abort.inc
+
+INSERT INTO t1 SELECT * FROM t1;
+--echo # Wait for at least 4 snapshots to be generated 
+--let $wait_condition= SELECT count(*) >=4 FROM INFORMATION_SCHEMA.SNAPSHOT_PERSISTENT_SNAPSHOT_INDEX
+--source include/wait_condition_or_abort.inc
+
+INSERT INTO t1 SELECT * FROM t1;
+--echo # Wait for at least 5 snapshots to be generated 
+--let $wait_condition= SELECT count(*) >=5 FROM INFORMATION_SCHEMA.SNAPSHOT_PERSISTENT_SNAPSHOT_INDEX
+--source include/wait_condition_or_abort.inc
+
+INSERT INTO t1 SELECT * FROM t1;
+--echo # Wait for at least 6 snapshots to be generated 
+--let $wait_condition= SELECT count(*) >=6 FROM INFORMATION_SCHEMA.SNAPSHOT_PERSISTENT_SNAPSHOT_INDEX
+--source include/wait_condition_or_abort.inc
+
+--echo # Purge persistent snapshot to timestamp
+--let $snapshot_created_ts = `SELECT CREATED_TS FROM INFORMATION_SCHEMA.SNAPSHOT_PERSISTENT_SNAPSHOT_INDEX LIMIT 1 OFFSET 2`
+--let $assert_text= Purge consistent snapshot.
+--let purge_res = `SELECT SNAPSHOT_ARCHIVE_PERSISTENT_PURGE('$snapshot_created_ts');`
+--let $assert_cond= INSTR("$purge_res","purge snapshot successfully") > 0
+--source include/assert.inc
+
+--let $assert_text= Check results after purge.
+--let $assert_cond= "[SELECT CREATED_TS FROM INFORMATION_SCHEMA.SNAPSHOT_PERSISTENT_SNAPSHOT_INDEX, CREATED_TS, 1]" = "$snapshot_created_ts"
+--source include/assert.inc
+
+--echo # Purge all persistent snapshot
+--let $assert_text= Purge consistent snapshot.
+--let purge_res = `SELECT SNAPSHOT_ARCHIVE_PERSISTENT_PURGE('all');`
+--let $assert_cond= INSTR("$purge_res","purge snapshot successfully") > 0
+--source include/assert.inc
+
+--let $assert_text= Keep the last consistent snapshot.
+--let $assert_cond= COUNT(*) > 0 FROM INFORMATION_SCHEMA.SNAPSHOT_PERSISTENT_SNAPSHOT_INDEX
+--source include/assert.inc
+
+--echo # Cleanup
+DROP TABLE t1;
+DROP DATABASE db1;

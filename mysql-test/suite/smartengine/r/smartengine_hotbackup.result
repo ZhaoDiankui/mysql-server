@@ -1,0 +1,76 @@
+drop table if exists t1;
+Warnings:
+Note	1051	Unknown table 'test.t1'
+create table t1 (a int primary key);
+insert into t1 values(42);
+set global smartengine_flush_memtable = 1;
+show variables like 'autocommit';
+Variable_name	Value
+autocommit	ON
+set global smartengine_hotbackup = 'checkpoint';
+ERROR HY000: SE: should begin a trx first
+set global smartengine_hotbackup = 'acquire';
+ERROR HY000: SE: should begin a trx first
+set global smartengine_hotbackup = 'incremental';
+ERROR HY000: SE: should begin a trx first
+set global smartengine_hotbackup = 'release';
+ERROR HY000: SE: should begin a trx first
+set autocommit = 0;
+set global smartengine_hotbackup = 'checkpoint';
+ERROR HY000: SE: should begin a trx first
+set global smartengine_hotbackup = 'acquire';
+ERROR HY000: SE: should begin a trx first
+set global smartengine_hotbackup = 'incremental';
+ERROR HY000: SE: should begin a trx first
+set global smartengine_hotbackup = 'release';
+ERROR HY000: SE: should begin a trx first
+set autocommit = 1;
+begin;
+set global smartengine_hotbackup = 'acquire';
+ERROR HY000: SE: should execute command: checkpoint before this command
+
+rollback;
+begin;
+set global smartengine_hotbackup = 'incremental';
+ERROR HY000: SE: should execute command: acquire before this command
+
+rollback;
+begin;
+set global smartengine_hotbackup = 'release';
+ERROR HY000: SE: should execute command: incremental before this command
+
+rollback;
+begin;
+set global smartengine_hotbackup = 'checkpoint';
+set global smartengine_hotbackup = 'incremental';
+ERROR HY000: SE: should execute command: acquire before this command
+
+rollback;
+begin;
+set global smartengine_hotbackup = 'checkpoint';
+select * from t1;
+a
+42
+set global smartengine_hotbackup = 'release';
+ERROR HY000: SE: should execute command: incremental before this command
+
+rollback;
+begin;
+set global smartengine_hotbackup = 'checkpoint';
+select * from t1;
+a
+42
+set global smartengine_hotbackup = 'acquire';
+set global smartengine_hotbackup = 'release';
+ERROR HY000: SE: should execute command: incremental before this command
+
+rollback;
+begin;
+set global smartengine_hotbackup = 'checkpoint';
+begin;
+set global smartengine_hotbackup = 'checkpoint';
+ERROR HY000: SE: there is another backup job running
+
+rollback;
+rollback;
+drop table t1;

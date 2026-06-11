@@ -1,0 +1,137 @@
+--source suite/smartengine/include/have_smartengine.inc
+
+--disable_warnings
+DROP TABLE IF EXISTS t1;
+--enable_warnings
+
+--echo ##### ROW FORMAT #####
+CREATE TABLE t1 (c1 int primary key, c2 char(0), c3 char(20), c4 char(6)) engine = SMARTENGINE;
+
+INSERT INTO t1 VALUES (1, "", "", " ");
+INSERT INTO t1 VALUES (2, "", "zds", "ppl");
+INSERT INTO t1 VALUES (3, "", " zds", "ppl ");
+INSERT INTO t1 VALUES (4, "", "   zds", "ppl   ");
+
+SELECT c1, CONCAT('$', c2, '$') AS c2, CONCAT('$', c3, '$') AS c3, CONCAT('$', c4, '$') AS c4 FROM t1;
+SELECT c1, LENGTH(c2), LENGTH(c3), LENGTH(c4) FROM t1;
+
+SET @OLD_SQL_MODE = @@SQL_MODE;
+SET SQL_MODE = 'PAD_CHAR_TO_FULL_LENGTH';
+SELECT c1, CONCAT('$', c2, '$') AS c2, CONCAT('$', c3, '$') AS c3, CONCAT('$', c4, '$') AS c4 FROM t1;
+SELECT c1, LENGTH(c2), LENGTH(c3), LENGTH(c4) FROM t1;
+SET SQL_MODE = @OLD_SQL_MODE;
+
+SET GLOBAL SMARTENGINE_FLUSH_MEMTABLE = ON;
+--echo restarting
+--source include/restart_mysqld.inc
+
+SELECT c1, CONCAT('$', c2, '$') AS c2, CONCAT('$', c3, '$') AS c3, CONCAT('$', c4, '$') AS c4 FROM t1;
+SELECT c1, LENGTH(c2), LENGTH(c3), LENGTH(c4) FROM t1;
+
+SET @OLD_SQL_MODE = @@SQL_MODE;
+SET SQL_MODE = 'PAD_CHAR_TO_FULL_LENGTH';
+SELECT c1, CONCAT('$', c2, '$') AS c2, CONCAT('$', c3, '$') AS c3, CONCAT('$', c4, '$') AS c4 FROM t1;
+SELECT c1, LENGTH(c2), LENGTH(c3), LENGTH(c4) FROM t1;
+SET SQL_MODE = @OLD_SQL_MODE;
+
+DROP TABLE t1;
+
+--echo ##### COLUMNAR FORMAT #####
+CREATE TABLE t1 (c1 int primary key, c2 char(0), c3 char(20), c4 char(6)) engine = SMARTENGINE, engine_attribute='{"data_format":"columnar"}';
+
+INSERT INTO t1 VALUES (1, "", "", " ");
+INSERT INTO t1 VALUES (2, "", "zds", "ppl");
+INSERT INTO t1 VALUES (3, "", " zds", "ppl ");
+INSERT INTO t1 VALUES (4, "", "   zds", "ppl   ");
+
+SELECT c1, CONCAT('$', c2, '$') AS c2, CONCAT('$', c3, '$') AS c3, CONCAT('$', c4, '$') AS c4 FROM t1;
+SELECT c1, LENGTH(c2), LENGTH(c3), LENGTH(c4) FROM t1;
+
+SET @OLD_SQL_MODE = @@SQL_MODE;
+SET SQL_MODE = 'PAD_CHAR_TO_FULL_LENGTH';
+SELECT c1, CONCAT('$', c2, '$') AS c2, CONCAT('$', c3, '$') AS c3, CONCAT('$', c4, '$') AS c4 FROM t1;
+SELECT c1, LENGTH(c2), LENGTH(c3), LENGTH(c4) FROM t1;
+SET SQL_MODE = @OLD_SQL_MODE;
+
+SET GLOBAL SMARTENGINE_FLUSH_MEMTABLE = ON;
+--echo restarting
+--source include/restart_mysqld.inc
+
+SELECT c1, CONCAT('$', c2, '$') AS c2, CONCAT('$', c3, '$') AS c3, CONCAT('$', c4, '$') AS c4 FROM t1;
+SELECT c1, LENGTH(c2), LENGTH(c3), LENGTH(c4) FROM t1;
+
+SET @OLD_SQL_MODE = @@SQL_MODE;
+SET SQL_MODE = 'PAD_CHAR_TO_FULL_LENGTH';
+SELECT c1, CONCAT('$', c2, '$') AS c2, CONCAT('$', c3, '$') AS c3, CONCAT('$', c4, '$') AS c4 FROM t1;
+SELECT c1, LENGTH(c2), LENGTH(c3), LENGTH(c4) FROM t1;
+SET SQL_MODE = @OLD_SQL_MODE;
+
+DROP TABLE t1;
+
+--echo ##### DDL #####
+CREATE TABLE t1 (c1 int primary key, c2 char(5)) engine = SMARTENGINE;
+
+INSERT INTO t1 VALUES (1, "zds");
+INSERT INTO t1 VALUES (2, "ppl");
+
+SELECT c1, CONCAT('$', c2, '$') AS c2 FROM t1;
+SELECT c1, LENGTH(c2) FROM t1;
+
+SET @OLD_SQL_MODE = @@SQL_MODE;
+SET SQL_MODE = 'PAD_CHAR_TO_FULL_LENGTH';
+SELECT c1, CONCAT('$', c2, '$') AS c2 FROM t1;
+SELECT c1, LENGTH(c2) FROM t1;
+SET SQL_MODE = @OLD_SQL_MODE;
+
+--echo #### modify char width
+ALTER TABLE t1 MODIFY COLUMN c2 CHAR(10);
+
+SELECT c1, CONCAT('$', c2, '$') AS c2 FROM t1;
+SELECT c1, LENGTH(c2) FROM t1;
+
+SET SQL_MODE = 'PAD_CHAR_TO_FULL_LENGTH';
+SELECT c1, CONCAT('$', c2, '$') AS c2 FROM t1;
+SELECT c1, LENGTH(c2) FROM t1;
+SET SQL_MODE = @OLD_SQL_MODE;
+
+
+--echo #### add new column with char type
+ALTER TABLE t1 ADD COLUMN c3 CHAR(20) DEFAULT "summer";
+
+INSERT INTO t1 VALUES (3, "ppl", "happy");
+
+SELECT c1, CONCAT('$', c2, '$') AS c2, CONCAT('$', c3, '$') AS c3 FROM t1;
+SELECT c1, LENGTH(c2), LENGTH(c3) FROM t1;
+
+SET @OLD_SQL_MODE = @@SQL_MODE;
+SET SQL_MODE = 'PAD_CHAR_TO_FULL_LENGTH';
+SELECT c1, CONCAT('$', c2, '$') AS c2, CONCAT('$', c3, '$') AS c3 FROM t1;
+SELECT c1, LENGTH(c2), LENGTH(c3) FROM t1;
+SET SQL_MODE = @OLD_SQL_MODE;
+
+--echo #### add new column in the middle
+ALTER TABLE t1 ADD COLUMN c4 CHAR(0) AFTER c2;
+
+SELECT c1, CONCAT('$', c2, '$') AS c2, CONCAT('$', c4, '$') AS c4, CONCAT('$', c3, '$') AS c3 FROM t1;
+SELECT c1, LENGTH(c2), LENGTH(c4), LENGTH(c3) FROM t1;
+
+SET @OLD_SQL_MODE = @@SQL_MODE;
+SET SQL_MODE = 'PAD_CHAR_TO_FULL_LENGTH';
+SELECT c1, CONCAT('$', c2, '$') AS c2, CONCAT('$', c4, '$') AS c4, CONCAT('$', c3, '$') AS c3 FROM t1;
+SELECT c1, LENGTH(c2), LENGTH(c4), LENGTH(c3) FROM t1;
+SET SQL_MODE = @OLD_SQL_MODE;
+
+INSERT INTO t1 VALUES (4, "ppl", "", "zds");
+
+SELECT c1, CONCAT('$', c2, '$') AS c2, CONCAT('$', c4, '$') AS c4, CONCAT('$', c3, '$') AS c3 FROM t1;
+SELECT c1, LENGTH(c2), LENGTH(c4), LENGTH(c3) FROM t1;
+
+SET @OLD_SQL_MODE = @@SQL_MODE;
+SET SQL_MODE = 'PAD_CHAR_TO_FULL_LENGTH';
+SELECT c1, CONCAT('$', c2, '$') AS c2, CONCAT('$', c4, '$') AS c4, CONCAT('$', c3, '$') AS c3 FROM t1;
+SELECT c1, LENGTH(c2), LENGTH(c4), LENGTH(c3) FROM t1;
+SET SQL_MODE = @OLD_SQL_MODE;
+
+DROP TABLE t1;
+
+--source suite/smartengine/include/check_smartengine_log_error.inc

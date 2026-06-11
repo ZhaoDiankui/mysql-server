@@ -1,0 +1,107 @@
+name: Enable Self-Runner
+
+on:
+  workflow_call:
+    inputs:
+      CLOUD_PROVIDER:
+        description: 'k8s cluster provider (e.g. eks/gke)'
+        type: string
+        required: false
+        default: 'eks'
+      ENABLE:
+        description: "enable flag:true"
+        type: string
+        required: false
+        default: 'true'
+      RUNNER_LABEL:
+        description: "runner label"
+        type: string
+        required: false
+        default: ''
+      RUNNER_NAMESPACE:
+        description: "runner namespace"
+        type: string
+        required: false
+        default: 'github-runner'
+
+env:
+  GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+  CLUSTER_NAME: "infracreate-gke"
+  GCP_REGION: "us-central1"
+  AWS_REGION: "ap-northeast-1"
+  AWS_CLUSTER: "foxlake-dev-001"
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+
+jobs:
+  enable-runner:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: azure/setup-kubectl@v3
+        with:
+          version: "v1.28.3"
+
+      - uses: aws-actions/setup-sam@v2
+        if: ${{ inputs.CLOUD_PROVIDER == 'eks' }}
+        with:
+          use-installer: true
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        if: ${{ inputs.CLOUD_PROVIDER == 'eks' && env.AWS_ACCESS_KEY_ID != '' && env.AWS_SECRET_ACCESS_KEY != '' }}
+        with:
+          aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
+          aws-region: "${{ env.AWS_REGION }}"
+
+      - if: ${{ inputs.CLOUD_PROVIDER == 'eks' }}
+        run: |
+          aws eks --region ${{ env.AWS_REGION }} update-kubeconfig --name ${{ env.AWS_CLUSTER }} \
+              --role-arn $(aws iam get-role --role-name ${{ env.AWS_CLUSTER }}-admin-role --query 'Role.Arn' --output text)
+
+      - if: ${{ inputs.CLOUD_PROVIDER == 'gke' && env.GOOGLE_CREDENTIALS != '' }}
+        id: 'auth'
+        name: 'Authenticate to Google Cloud'
+        uses: 'google-github-actions/auth@v1'
+        with:
+          credentials_json: '${{ env.GOOGLE_CREDENTIALS }}'
+
+      - name: setup gke-gcloud-auth-plugin
+        if: ${{ inputs.CLOUD_PROVIDER == 'gke' }}
+        uses: simenandre/setup-gke-gcloud-auth-plugin@v1
+
+      - uses: google-github-actions/get-gke-credentials@v1
+        if: ${{ inputs.CLOUD_PROVIDER == 'gke' }}
+        with:
+          cluster_name: ${{ env.CLUSTER_NAME }}
+          location: ${{ env.GCP_REGION }}
+
+      - name: enable runner
+        run: |
+          RUNNER_NAMESPACE="${{ inputs.RUNNER_NAMESPACE }}"
+          if [[ -z "${{ inputs.RUNNER_NAMESPACE }}" ]]; then
+              RUNNER_NAMESPACE="github-runner"
+          fi
+          
+          runner_list=$(kubectl get runnerdeployments -n ${RUNNER_NAMESPACE} | (grep "${{ github.repository }}" | grep "${{ inputs.RUNNER_LABEL }}" || true) | awk '{print $1}')
+          if [[ -n "$runner_list" ]]; then
+              for runner_name in $(echo "$runner_list"); do
+                  echo "runner name: $runner_name"
+                  hautoscalers=$(kubectl get horizontalrunnerautoscalers -n ${RUNNER_NAMESPACE} | (grep "$runner_name-autoscaler" || true) )
+                  if [[ "${{ inputs.ENABLE }}" == "true" ]]; then
+                      echo "enable runner"
+                      if [[ -n "$hautoscalers" ]]; then
+                          echo "enable runner autoscaler"
+                          kubectl patch horizontalrunnerautoscalers $runner_name-autoscaler -n ${RUNNER_NAMESPACE} -p '{"spec":{"minReplicas": 1}}' --type=merge
+                      fi
+                      kubectl patch runnerdeployments $runner_name -n ${RUNNER_NAMESPACE} -p '{"spec":{"replicas": 1}}' --type=merge
+                  else
+                      echo "disable runner"
+                      if [[ -n "$hautoscalers" ]]; then
+                          echo "disable runner autoscaler"
+                          kubectl patch horizontalrunnerautoscalers $runner_name-autoscaler -n ${RUNNER_NAMESPACE} -p '{"spec":{"minReplicas": 0}}' --type=merge
+                      fi
+                      kubectl patch runnerdeployments $runner_name -n ${RUNNER_NAMESPACE} -p '{"spec":{"replicas": 0}}' --type=merge
+                  fi
+              done
+          fi

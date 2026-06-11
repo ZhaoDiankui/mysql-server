@@ -1,0 +1,3 @@
+--smartengine_memtable_size=16k
+--smartengine_level0_file_num_compaction_trigger=4
+--smartengine_compression_per_level=kNoCompression

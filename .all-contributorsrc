@@ -1,0 +1,115 @@
+{
+  "projectName": "wesql",
+  "projectOwner": "wesql",
+  "repoType": "github",
+  "repoHost": "https://github.com",
+  "files": [
+    "README.md"
+  ],
+  "imageSize": 100,
+  "commit": true,
+  "commitConvention": "none",
+  "contributors": [
+    {
+      "login": "demian0110",
+      "name": "demian0110",
+      "avatar_url": "https://avatars.githubusercontent.com/u/4656979?v=4",
+      "profile": "https://github.com/demian0110",
+      "contributions": [
+        "code"
+      ]
+    },
+    {
+      "login": "zdsppl",
+      "name": "dongsheng zhao",
+      "avatar_url": "https://avatars.githubusercontent.com/u/4177695?v=4",
+      "profile": "https://github.com/zdsppl",
+      "contributions": [
+        "code"
+      ]
+    },
+    {
+      "login": "ZhaoDiankui",
+      "name": "diankuizhao",
+      "avatar_url": "https://avatars.githubusercontent.com/u/16314367?v=4",
+      "profile": "https://github.com/ZhaoDiankui",
+      "contributions": [
+        "code"
+      ]
+    },
+    {
+      "login": "JingchengLi",
+      "name": "lijingcheng",
+      "avatar_url": "https://avatars.githubusercontent.com/u/5918144?v=4",
+      "profile": "https://github.com/JingchengLi",
+      "contributions": [
+        "code"
+      ]
+    },
+    {
+      "login": "JashBook",
+      "name": "huangzhangshu",
+      "avatar_url": "https://avatars.githubusercontent.com/u/109708205?v=4",
+      "profile": "https://github.com/JashBook",
+      "contributions": [
+        "test"
+      ]
+    },
+    {
+      "login": "yangkaiyu-web",
+      "name": "yangkaiyu-web",
+      "avatar_url": "https://avatars.githubusercontent.com/u/59348064?v=4",
+      "profile": "https://github.com/yangkaiyu-web",
+      "contributions": [
+        "test"
+      ]
+    },
+    {
+      "login": "cnut",
+      "name": "Peng Wang",
+      "avatar_url": "https://avatars.githubusercontent.com/u/2270906?v=4",
+      "profile": "https://github.com/cnut",
+      "contributions": [
+        "code"
+      ]
+    },
+    {
+      "login": "ahjing99",
+      "name": "yijing",
+      "avatar_url": "https://avatars.githubusercontent.com/u/107018199?v=4",
+      "profile": "https://github.com/ahjing99",
+      "contributions": [
+        "test"
+      ]
+    },
+    {
+      "login": "buwen",
+      "name": "buwen",
+      "avatar_url": "https://avatars.githubusercontent.com/u/3852164?v=4",
+      "profile": "https://github.com/buwen",
+      "contributions": [
+        "code"
+      ]
+    },
+    {
+      "login": "d976045024",
+      "name": "dqh",
+      "avatar_url": "https://avatars.githubusercontent.com/u/62782300?v=4",
+      "profile": "https://github.com/d976045024",
+      "contributions": [
+        "code"
+      ]
+    },
+    {
+      "login": "ksql-team",
+      "name": "ksql-team",
+      "avatar_url": "https://avatars.githubusercontent.com/u/151022862?v=4",
+      "profile": "https://github.com/ksql-team",
+      "contributions": [
+        "code"
+      ]
+    }
+  ],
+  "contributorsPerLine": 7,
+  "linkToUsage": false
+}

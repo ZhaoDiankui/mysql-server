@@ -1,0 +1,102 @@
+set debug_sync='RESET';
+drop table if exists t1;
+create table t1 (id int, value int, primary key (id)) ENGINE = SMARTENGINE;
+create table t2 (id int, id2 int, value int, primary key (id), unique key (id2)) ENGINE = SMARTENGINE;
+begin;
+insert into t1 values (1,1);
+set session smartengine_lock_wait_timeout=50;
+begin;
+insert into t1 values (1,2);
+commit;
+ERROR 23000: Duplicate entry '1' for key 't1.PRIMARY'
+commit;
+select * from t1;
+id	value
+1	1
+truncate table t1;
+begin;
+insert into t2 values (1,1,1);
+set transaction_isolation = 'READ-COMMITTED';
+begin;
+insert into t2 values (2,1,2);
+commit;
+ERROR 23000: Duplicate entry '1' for key 't2.id2'
+commit;
+select * from t2;
+id	id2	value
+1	1	1
+truncate table t2;
+begin;
+insert into t2 values (1,1,1);
+set transaction_isolation = 'REPEATABLE-READ';
+begin;
+insert into t2 values (2,1,2);
+commit;
+ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
+commit;
+select * from t2;
+id	id2	value
+1	1	1
+truncate table t2;
+begin;
+insert into t1 values (1,1);
+begin;
+insert into t1 values (1,2);
+rollback;
+commit;
+select * from t1;
+id	value
+1	2
+truncate table t1;
+begin;
+insert into t2 values (1,1,1);
+begin;
+insert into t2 values (2,1,2);
+rollback;
+commit;
+select * from t2;
+id	id2	value
+2	1	2
+truncate table t2;
+set debug_sync='se.update_write_row_after_unique_check SIGNAL parked1 WAIT_FOR go1';
+insert into t1 values (1,1);
+set debug_sync='se.update_write_row_after_unique_check SIGNAL parked2 WAIT_FOR go2';
+insert into t2 values (1,1,1);
+set debug_sync='now WAIT_FOR parked1';
+set debug_sync='now WAIT_FOR parked2';
+set session smartengine_lock_wait_timeout=1;
+insert into t1 values (1,2);
+ERROR HY000: Lock wait timeout exceeded; try restarting transaction
+insert into t2 values (2,1,2);
+ERROR HY000: Lock wait timeout exceeded; try restarting transaction
+set debug_sync='now SIGNAL go1';
+set debug_sync='now SIGNAL go2';
+insert into t1 values (1,2);
+ERROR 23000: Duplicate entry '1' for key 't1.PRIMARY'
+insert into t2 values (2,1,2);
+ERROR 23000: Duplicate entry '1' for key 't2.id2'
+select * from t1;
+id	value
+1	1
+select * from t2;
+id	id2	value
+1	1	1
+set debug_sync='RESET';
+drop table t1;
+drop table t2;
+drop table if exists t1;
+drop table if exists t2;
+drop table if exists t3;
+create table t1 (id int, value int, primary key (id)) ENGINE = SMARTENGINE;
+create table t2 (id int, id2 int, value int, primary key (id), unique key (id2)) ENGINE = SMARTENGINE;
+create table t3 (id int, value int) ENGINE = SMARTENGINE;
+SET @old_val = @@session.unique_checks;
+set @@session.unique_checks = FALSE;
+insert into t1 values (1, 1), (1, 2);
+insert into t2 values (1, 1, 1), (1, 2, 1);
+ERROR 23000: Duplicate entry '1' for key 't2.PRIMARY'
+insert into t3 values (1, 1), (1, 1);
+set @@session.unique_checks = @old_val;
+drop table t1;
+drop table t2;
+drop table t3;

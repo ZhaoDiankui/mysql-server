@@ -1,0 +1,14 @@
+--source suite/smartengine/include/have_smartengine.inc
+select @@smartengine_idle_tasks_schedule_time into @saved_smartengine_idle_tasks_schedule_time;
+
+CREATE TABLE test_compaction(c1 int primary key, c2 int) ENGINE = SMARTENGINE;
+insert into test_compaction value(1, 1);
+insert into test_compaction value(2, 2);
+insert into test_compaction value(3, 3);
+set global smartengine_idle_tasks_schedule_time=1;
+set global smartengine_flush_memtable=on;
+select a.level, a.layer, a.extents from information_schema.SMARTENGINE_SUBTABLE as a, information_schema.SMARTENGINE_DDL as b where a.subtable_id=b.subtable_id and b.TABLE_NAME="test_compaction";
+--sleep 90
+select a.level, a.layer, a.extents from information_schema.SMARTENGINE_SUBTABLE as a, information_schema.SMARTENGINE_DDL as b where a.subtable_id=b.subtable_id and b.TABLE_NAME="test_compaction";
+drop table test_compaction;
+set global smartengine_idle_tasks_schedule_time=@saved_smartengine_idle_tasks_schedule_time;

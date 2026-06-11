@@ -1,0 +1,7 @@
+SET @start_global_value = @@global.SMARTENGINE_CONCURRENT_WRITABLE_FILE_BUFFER_NUM;
+SELECT @start_global_value;
+@start_global_value
+4
+"Trying to set variable @@global.SMARTENGINE_CONCURRENT_WRITABLE_FILE_BUFFER_NUM to 444. It should fail because it is readonly."
+SET @@global.SMARTENGINE_CONCURRENT_WRITABLE_FILE_BUFFER_NUM   = 444;
+ERROR HY000: Variable 'smartengine_concurrent_writable_file_buffer_num' is a read only variable

@@ -1,0 +1,11 @@
+--source suite/smartengine/include/have_smartengine.inc
+
+--replace_column 2 ###
+show global status like 'smartengine\_%';
+
+--echo
+--echo
+--replace_column 3 ###
+show engine smartengine status;
+
+--source suite/smartengine/include/check_smartengine_log_error.inc

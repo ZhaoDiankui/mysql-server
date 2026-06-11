@@ -1,0 +1,350 @@
+name: CICD Pull Request
+
+on:
+  pull_request:
+    paths-ignore:
+      - '.github/**'
+      - 'test/chaos_test/**'
+
+env:
+  GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+concurrency:
+  group: "${{ github.workflow }}-${{ github.ref }}"
+  cancel-in-progress: true
+
+jobs:
+  enable-runner:
+    uses: ./.github/workflows/enable-self-runner.yml
+    with:
+      CLOUD_PROVIDER: "eks"
+      RUNNER_LABEL: "eks-oraclelinux8-amd64-runner"
+    secrets: inherit
+
+  mtr-serverless:
+    needs: [ enable-runner ]
+    outputs:
+      runner-name: ${{ steps.get_runner_name.outputs.runner-name }}
+    name: mtr serverless
+    runs-on: [self-hosted, eks-oraclelinux8-amd64-runner ]
+    steps:
+      - name: Checkout MySQL Server Code
+        uses: actions/checkout@v4
+        with:
+          repository: mysql/mysql-server
+          ref: mysql-8.0.35
+
+      - name: Checkout Wesql Code
+        uses: actions/checkout@v4
+        with:
+          path: ./wesql
+
+      - name: Apply WeSQL Patches
+        run: |
+          cp -r ./wesql/* ./
+          git apply patches/mysql-server-8.0.35.patch
+
+      - name: copy boost_1_77_0
+        run: |
+          extra_dir="${{ github.workspace }}/extra"
+          mkdir -pv ${extra_dir}
+          cp /home/mysql/boost_1_77_0.tar.bz2 ${extra_dir}
+          sudo mkdir -pv /usr/local/mysql
+          sudo chown -R mysql:mysql /usr/local/mysql
+          
+          sudo yum install -y perl-core
+          sudo yum install perl-App-cpanminus
+          sudo cpan App::cpanminus
+          sudo cpanm Memoize
+          
+          sudo yum install python3-devel python3-pip mysql-devel
+          sudo pip3 install mysqlclient
+          sudo ln -sfn /usr/bin/python3 /usr/bin/python
+
+      - name: cmake
+        run: |
+          mkdir -pv build && cd build
+          cmake3 ../ -B ./ \
+            -DCMAKE_INSTALL_PREFIX="/usr/local/mysql" \
+            -DWITH_SSL="system" \
+            -DCMAKE_BUILD_TYPE="DEBUG" \
+            -DWITH_ROUTER=OFF \
+            -DWITH_CLONE=1 \
+            -DWITH_FAIL_POINT=ON   \
+            -DWITH_WESQL_TEST=1 \
+            -DDOWNLOAD_BOOST=1 -DWITH_BOOST="../extra/"
+
+      - name: make install
+        run: |
+          cd build
+          make -j$(echo "$(nproc)")
+          make install
+          echo "export PATH=/usr/local/mysql/bin:$PATH" >> ~/.bashrc && source ~/.bashrc
+          echo "export LD_LIBRARY_PATH=/usr/local/mysql/lib:$LD_LIBRARY_PATH" >> ~/.bashrc && source ~/.bashrc
+
+      - name: install and start minio service
+        run: |
+          sudo dnf install ./extra/minio.rpm
+          export MINIO_ROOT_USER="minio123"
+          export MINIO_ROOT_PASSWORD="minio123"
+          export MINIO_DATA_DIR=/home/mysql/wesql-mtr-mino-data
+          mkdir -p $MINIO_DATA_DIR
+          nohup /usr/local/bin/minio server $MINIO_DATA_DIR --console-address :9001 &
+
+      - name: run mtr on serverless
+        run: |
+          sudo yum install awscli
+          cd ./build/mysql-test
+          CUR_DIR=`pwd`
+          export AWS_ACCESS_KEY_ID=minio123
+          export AWS_SECRET_ACCESS_KEY=minio123
+          export AWS_DEFAULT_OUTPUT=json
+          aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
+          aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
+          aws configure set output $AWS_DEFAULT_OUTPUT
+          aws configure set default.s3.signature_version s3v4
+
+          ####
+          #aws --endpoint-url http://127.0.0.1:9000 s3 rm s3://wesql-mtr-tests --recursive
+          #aws --endpoint-url http://127.0.0.1:9000 s3 rb s3://wesql-mtr-tests
+          ####
+          aws --endpoint-url http://127.0.0.1:9000 s3 mb s3://wesql-mtr-tests
+
+          ./mysql-test-run.pl --suite=smartengine_consistent_snapshot  --nowarnings --retry=3  --parallel=6 --force --report-unstable-tests \
+              --initialize="--serverless=true" \
+              --initialize="--objectstore_provider=local" \
+              --skip-test-list=collections/disabled-smartengine-serverless.def
+          ./mysql-test-run.pl --suite=smartengine  --nowarnings --retry=3  --parallel=6 --force --report-unstable-tests \
+              --initialize="--serverless=true" \
+              --initialize="--objectstore_provider=minio" \
+              --initialize="--objectstore_region=" \
+              --initialize="--objectstore_bucket=wesql-mtr-tests" \
+              --initialize="--objectstore_endpoint=http://127.0.0.1:9000" \
+              --initialize="--snapshot_archive_smartengine_tar_mode=TAR" \
+              --initialize="--snapshot_archive_innodb_tar_mode=TAR" \
+              --skip-test-list=collections/disabled-smartengine-serverless.def
+
+      - name: view logs of mtr serverless
+        if: ${{ failure() }}
+        run: |
+          for logfile in $( ls build/mysql-test/var/*/log/*.err ); do
+              echo "logfile:"$logfile
+              cat $logfile
+          done
+
+      - name: get self runner name
+        id: get_runner_name
+        if: ${{ always() }}
+        run: |
+          echo runner-name=${RUNNER_NAME} >> $GITHUB_OUTPUT
+
+  mtr-normal-file:
+    needs: [ enable-runner ]
+    outputs:
+      runner-name: ${{ steps.get_runner_name.outputs.runner-name }}
+    name: mtr normal-file
+    runs-on: [self-hosted, eks-oraclelinux8-amd64-runner ]
+    steps:
+      - name: Checkout MySQL Server Code
+        uses: actions/checkout@v4
+        with:
+          repository: mysql/mysql-server
+          ref: mysql-8.0.35
+
+      - name: Checkout Wesql Code
+        uses: actions/checkout@v4
+        with:
+          path: ./wesql
+
+      - name: Apply WeSQL Patches
+        run: |
+          cp -r ./wesql/* ./
+          git apply patches/mysql-server-8.0.35.patch
+
+      - name: copy boost_1_77_0
+        run: |
+          extra_dir="${{ github.workspace }}/extra"
+          mkdir -pv ${extra_dir}
+          cp /home/mysql/boost_1_77_0.tar.bz2 ${extra_dir}
+          sudo mkdir -pv /usr/local/mysql
+          sudo chown -R mysql:mysql /usr/local/mysql
+          
+          sudo yum install -y perl-core
+          sudo yum install perl-App-cpanminus
+          sudo cpan App::cpanminus
+          sudo cpanm Memoize
+          
+          sudo yum install python3-devel python3-pip mysql-devel
+          sudo pip3 install mysqlclient
+          sudo ln -sfn /usr/bin/python3 /usr/bin/python
+
+      - name: cmake
+        run: |
+          mkdir -pv build && cd build
+          cmake3 ../ -B ./ \
+            -DCMAKE_INSTALL_PREFIX="/usr/local/mysql" \
+            -DWITH_SSL="system" \
+            -DCMAKE_BUILD_TYPE="DEBUG" \
+            -DWITH_ROUTER=OFF \
+            -DWITH_CLONE=1 \
+            -DWITH_FAIL_POINT=ON   \
+            -DWITH_WESQL_TEST=1 \
+            -DDOWNLOAD_BOOST=1 -DWITH_BOOST="../extra/"
+
+      - name: make install
+        run: |
+          cd build
+          make -j$(echo "$(nproc)")
+          make install
+          echo "export PATH=/usr/local/mysql/bin:$PATH" >> ~/.bashrc && source ~/.bashrc
+          echo "export LD_LIBRARY_PATH=/usr/local/mysql/lib:$LD_LIBRARY_PATH" >> ~/.bashrc && source ~/.bashrc
+
+      - name: run mtr on normal file
+        run: |
+          cd ./build/mysql-test
+          ./mysql-test-run.pl --suite=raft_replication  --nowarnings --retry=3  --parallel=6 --force --report-unstable-tests --initialize="--serverless=false"
+          ./mysql-test-run.pl --suite=smartengine --nowarnings --retry=3  --parallel=6 --force --report-unstable-tests --initialize="--serverless=false"
+
+      - name: view logs of mtr on normal file
+        if: ${{ failure() }}
+        run: |
+          for logfile in $( ls build/mysql-test/var/*/log/*.err ); do
+              echo "logfile:"$logfile
+              cat $logfile
+          done
+
+      - name: get self runner name
+        id: get_runner_name
+        if: ${{ always() }}
+        run: |
+          echo runner-name=${RUNNER_NAME} >> $GITHUB_OUTPUT
+
+
+  run-se-ut:
+    name: smartengine unit tests
+    runs-on: [self-hosted, eks-oraclelinux8-amd64-runner ]
+    needs: [ enable-runner ]
+    outputs:
+      runner-name: ${{ steps.get_runner_name.outputs.runner-name }}
+    steps:
+      - name: Checkout MySQL Server Code
+        uses: actions/checkout@v4
+        with:
+          repository: mysql/mysql-server
+          ref: mysql-8.0.35
+
+      - name: Checkout Wesql Code
+        uses: actions/checkout@v4
+        with:
+          path: ./wesql
+
+      - name: Apply WeSQL Patches
+        run: |
+          cp -r ./wesql/* ./
+          git apply patches/mysql-server-8.0.35.patch
+
+      - name: copy boost_1_77_0
+        run: |
+          extra_dir="${{ github.workspace }}/extra"
+          mkdir -pv ${extra_dir}
+          cp /home/mysql/boost_1_77_0.tar.bz2 ${extra_dir}
+          sudo mkdir -pv /usr/local/mysql
+          sudo chown -R mysql:mysql /usr/local/mysql
+          
+          sudo yum install -y perl-core
+          sudo yum install perl-App-cpanminus
+          sudo cpan App::cpanminus
+          sudo cpanm Memoize
+          
+          sudo yum install python3-devel python3-pip mysql-devel
+          sudo pip3 install mysqlclient
+          sudo ln -sfn /usr/bin/python3 /usr/bin/python
+
+      - name: cmake
+        run: |
+          sudo yum install which -y
+          source /opt/rh/gcc-toolset-12/enable
+                
+          # install gflags
+          cd ./storage/smartengine/core
+          tar xvzf third-party/gflags-v2.2.2.tar.gz
+          cd gflags-2.2.2
+          mkdir build && cd build
+          cmake -DBUILD_SHARED_LIBS=OFF -DCMAKE_CXX_FLAGS="-fPIC -D_GLIBCXX_USE_CXX11_ABI=0" -DGFLAGS_NAMESPACE="gflags"  ..
+          make -j8 && sudo make install
+          cd ../../
+
+          sh build_smartengine.sh -t debug
+
+      - name: run test
+        run: |
+          cd ./storage/smartengine/core/bu-Debug
+          make test
+
+      - name: get self runner name
+        id: get_runner_name
+        if: ${{ always() }}
+        run: |
+          echo runner-name=${RUNNER_NAME} >> $GITHUB_OUTPUT
+
+
+  remove-serverless-runner:
+    runs-on: ubuntu-latest
+    needs: [ mtr-serverless ]
+    if: ${{ always() }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Delete self runner
+        continue-on-error: true
+        uses: './.github/actions/delete-runner'
+        with:
+          github-token: ${{ env.GITHUB_TOKEN }}
+          runner-name: ${{ needs.mtr-serverless.outputs.runner-name }}
+          runner-namespace: "github-runner"
+          access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
+          secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
+
+  remove-normal-file-runner:
+    runs-on: ubuntu-latest
+    needs: [ mtr-normal-file ]
+    if: ${{ always() }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Delete self runner
+        continue-on-error: true
+        uses: './.github/actions/delete-runner'
+        with:
+          github-token: ${{ env.GITHUB_TOKEN }}
+          runner-name: ${{ needs.mtr-normal-file.outputs.runner-name }}
+          runner-namespace: "github-runner"
+          access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
+          secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
+
+  remove-se-ut-runner:
+    runs-on: ubuntu-latest
+    needs: [ run-se-ut ]
+    if: ${{ always() }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Delete self runner
+        continue-on-error: true
+        uses: './.github/actions/delete-runner'
+        with:
+          github-token: ${{ env.GITHUB_TOKEN }}
+          runner-name: ${{ needs.run-se-ut.outputs.runner-name }}
+          access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
+          secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
+
+  disable-runner:
+    needs: [ mtr-serverless, mtr-normal-file ]
+    if: ${{ always() }}
+    uses: ./.github/workflows/enable-self-runner.yml
+    with:
+      RUNNER_LABEL: "eks-oraclelinux8-amd64-runner"
+      ENABLE: "disable"
+    secrets: inherit

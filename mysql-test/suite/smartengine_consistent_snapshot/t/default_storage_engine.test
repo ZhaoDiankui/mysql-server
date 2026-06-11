@@ -1,0 +1,38 @@
+--disable_warnings
+DROP TABLE IF EXISTS t1;
+--enable_warnings
+
+## Not set specific engine
+CREATE TABLE t1 (c1 int primary key, c2 int);
+SHOW CREATE TABLE t1;
+DROP TABLE t1;
+
+## Set the engine to innodb
+## Has warning
+CREATE TABLE t1 (c1 int primary key, c2 int) ENGINE = INNODB;
+SHOW CREATE TABLE t1;
+DROP TABLE t1;
+
+## Set the engine to innodb with smartengine unsupported feature
+--error 1105
+CREATE TABLE t1 (c1 varchar(10) primary key, c2 char(2)) ENGINE = INNODB CHARSET=BIG5;
+
+## Set default storage engine
+SHOW VARIABLES LIKE "default_storage_engine";
+## Has warning
+SET default_storage_engine = INNODB;
+
+CREATE TABLE t1 (c1 int primary key, c2 int);
+SHOW CREATE TABLE t1;
+DROP TABLE t1;
+
+## Has warning
+SET GLOBAL default_storage_engine = INNODB;
+
+CREATE TABLE t1 (c1 int primary key, c2 int);
+SHOW CREATE TABLE t1;
+DROP TABLE t1;
+
+--source suite/smartengine/include/check_smartengine_log_error.inc
+
+

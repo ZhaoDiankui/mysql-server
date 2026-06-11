@@ -1,0 +1,16 @@
+# suite/smartengine_ext/t/is_engines_smartengine.test
+#
+# Check the content of information_schema.engines
+# Variant for storage engine SMARTENGINE
+#
+# Author:
+# 2008-01-23 mleich WL#4203 Reorganize and fix the data dictionary tests of
+#                           testsuite smartengine_ext
+#
+
+
+
+let $engine_type = SMARTENGINE;
+--vertical_results
+eval SELECT * FROM information_schema.engines
+WHERE ENGINE = '$engine_type';

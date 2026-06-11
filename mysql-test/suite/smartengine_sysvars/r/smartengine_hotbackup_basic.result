@@ -1,0 +1,6 @@
+begin;
+set global smartengine_hotbackup = 'checkpoint';
+set global smartengine_hotbackup = 'acquire';
+set global smartengine_hotbackup = 'incremental';
+set global smartengine_hotbackup = 'release';
+commit;

@@ -1,0 +1,2 @@
+--slave-transaction-retries=0
+--smartengine_lock_wait_timeout=100

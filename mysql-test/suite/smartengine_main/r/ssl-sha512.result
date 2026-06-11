@@ -1,0 +1,31 @@
+CREATE USER u1@localhost IDENTIFIED BY 'secret' REQUIRE SSL;
+GRANT SELECT ON test.* TO u1@localhost;
+Variable_name	Value
+admin_ssl_ca	
+admin_ssl_capath	
+admin_ssl_cert	
+admin_ssl_cipher	
+admin_ssl_crl	
+admin_ssl_crlpath	
+admin_ssl_key	
+have_openssl	YES
+have_ssl	YES
+mysqlx_ssl_ca	
+mysqlx_ssl_capath	
+mysqlx_ssl_cert	
+mysqlx_ssl_cipher	
+mysqlx_ssl_crl	
+mysqlx_ssl_crlpath	
+mysqlx_ssl_key	
+performance_schema_show_processlist	OFF
+ssl_ca	MYSQL_TEST_DIR/std_data/ca-sha512.pem
+ssl_capath	
+ssl_cert	MYSQL_TEST_DIR/std_data/server-cert-sha512.pem
+ssl_cipher	DHE-RSA-AES256-SHA
+ssl_crl	
+ssl_crlpath	
+ssl_fips_mode	OFF
+ssl_key	MYSQL_TEST_DIR/std_data/server-key-sha512.pem
+ssl_session_cache_mode	ON
+ssl_session_cache_timeout	300
+DROP USER u1@localhost;

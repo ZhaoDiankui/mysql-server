@@ -1,0 +1,39 @@
+use test;
+create table t0 (id int, data  char(20), primary key(id));
+set global smartengine_flush_log_at_trx_commit=2;
+show variables like 'smartengine_flush_threads';
+Variable_name	Value
+smartengine_flush_threads	2
+show variables like 'smartengine_compaction_threads';
+Variable_name	Value
+smartengine_compaction_threads	4
+show variables like 'smartengine_flush_log_at_trx_commit';
+Variable_name	Value
+smartengine_flush_log_at_trx_commit	2
+select sleep(2);
+sleep(2)
+0
+set global smartengine_flush_log_at_trx_commit=1;
+show variables like 'smartengine_flush_threads';
+Variable_name	Value
+smartengine_flush_threads	2
+show variables like 'smartengine_compaction_threads';
+Variable_name	Value
+smartengine_compaction_threads	4
+show variables like 'smartengine_flush_log_at_trx_commit';
+Variable_name	Value
+smartengine_flush_log_at_trx_commit	1
+insert into t0 values(0, '123456');
+set global smartengine_flush_log_at_trx_commit=0;
+show variables like 'smartengine_flush_threads';
+Variable_name	Value
+smartengine_flush_threads	2
+show variables like 'smartengine_compaction_threads';
+Variable_name	Value
+smartengine_compaction_threads	4
+show variables like 'smartengine_flush_log_at_trx_commit';
+Variable_name	Value
+smartengine_flush_log_at_trx_commit	0
+insert into t0 values(1, '123456');
+set global smartengine_flush_log_at_trx_commit=1;
+drop table t0;

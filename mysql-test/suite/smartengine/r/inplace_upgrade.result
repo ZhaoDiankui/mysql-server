@@ -1,0 +1,351 @@
+# Stop DB server which was created by MTR default
+SHOW DATABASES;
+Database
+information_schema
+mysql
+performance_schema
+sys
+test
+USE test;
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `id` int NOT NULL,
+  `data` char(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_data` (`data`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+SELECT * FROM t1;
+id	data
+1	12345
+CREATE TABLE t2 (ID INT, DATA CHAR(20), DATA2 TEXT, PRIMARY KEY(`ID`), KEY(`DATA`)) ENGINE=SMARTENGINE;
+INSERT INTO t2 VALUES (1,'12345','ABCDEFG');
+SELECT * FROM t2;
+ID	DATA	DATA2
+1	12345	ABCDEFG
+ALTER TABLE t1 ADD COLUMN data2 VARCHAR(100) DEFAULT 'abcdefg', ALGORITHM=INSTANT;
+ALTER TABLE t2 ADD COLUMN data3 VARCHAR(100) DEFAULT 'abcdefg', ALGORITHM=INSTANT;
+ALTER TABLE t1 ADD INDEX k_2(`data2`);
+ALTER TABLE t2 ADD INDEX k_3(`data3`);
+CHECK TABLE t1;
+Table	Op	Msg_type	Msg_text
+test.t1	check	status	OK
+CHECK TABLE t2;
+Table	Op	Msg_type	Msg_text
+test.t2	check	status	OK
+USE information_schema;
+"--smartengine=1, show all smartengine info tables"
+SHOW TABLES LIKE 'SMARTENGINE%';
+Tables_in_information_schema (SMARTENGINE%)
+SMARTENGINE_CFSTATS
+SMARTENGINE_COLUMNS
+SMARTENGINE_COMPACTION_HISTORY
+SMARTENGINE_COMPACTION_STATS
+SMARTENGINE_COMPACTION_TASK
+SMARTENGINE_DBSTATS
+SMARTENGINE_DDL
+SMARTENGINE_DEBUG_INFO
+SMARTENGINE_GLOBAL_INFO
+SMARTENGINE_LOCKS
+SMARTENGINE_MEM_ALLOC
+SMARTENGINE_PERF_CONTEXT
+SMARTENGINE_PERF_CONTEXT_GLOBAL
+SMARTENGINE_QUERY_TRACE
+SMARTENGINE_SUBTABLE
+SMARTENGINE_TABLES
+SMARTENGINE_TABLE_SPACE
+SMARTENGINE_TRX
+# restart again, test recovery with --smartengine=1
+USE test;
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `id` int NOT NULL,
+  `data` char(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `data2` varchar(100) COLLATE utf8mb4_general_ci DEFAULT 'abcdefg',
+  PRIMARY KEY (`id`),
+  KEY `idx_data` (`data`),
+  KEY `k_2` (`data2`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+SHOW CREATE TABLE t2;
+Table	Create Table
+t2	CREATE TABLE `t2` (
+  `ID` int NOT NULL,
+  `DATA` char(20) COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `DATA2` text COLLATE utf8mb4_general_ci,
+  `data3` varchar(100) COLLATE utf8mb4_general_ci DEFAULT 'abcdefg',
+  PRIMARY KEY (`ID`),
+  KEY `DATA` (`DATA`),
+  KEY `k_3` (`data3`)
+) ENGINE=SMARTENGINE DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+SELECT * FROM t1;
+id	data	data2
+1	12345	abcdefg
+SELECT * FROM t2;
+ID	DATA	DATA2	data3
+1	12345	ABCDEFG	abcdefg
+ALTER TABLE t1 ADD COLUMN data3 VARCHAR(100) DEFAULT '1234567890', ALGORITHM=INSTANT;
+ALTER TABLE t2 ADD COLUMN data4 VARCHAR(100) DEFAULT '1234567890', ALGORITHM=INSTANT;
+ALTER TABLE t1 ADD INDEX k_3(`data3`);
+ALTER TABLE t2 ADD INDEX k_4(`data4`);
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `id` int NOT NULL,
+  `data` char(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `data2` varchar(100) COLLATE utf8mb4_general_ci DEFAULT 'abcdefg',
+  `data3` varchar(100) COLLATE utf8mb4_general_ci DEFAULT '1234567890',
+  PRIMARY KEY (`id`),
+  KEY `idx_data` (`data`),
+  KEY `k_2` (`data2`),
+  KEY `k_3` (`data3`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+SHOW CREATE TABLE t2;
+Table	Create Table
+t2	CREATE TABLE `t2` (
+  `ID` int NOT NULL,
+  `DATA` char(20) COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `DATA2` text COLLATE utf8mb4_general_ci,
+  `data3` varchar(100) COLLATE utf8mb4_general_ci DEFAULT 'abcdefg',
+  `data4` varchar(100) COLLATE utf8mb4_general_ci DEFAULT '1234567890',
+  PRIMARY KEY (`ID`),
+  KEY `DATA` (`DATA`),
+  KEY `k_3` (`data3`),
+  KEY `k_4` (`data4`)
+) ENGINE=SMARTENGINE DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+SELECT * FROM t1;
+id	data	data2	data3
+1	12345	abcdefg	1234567890
+SELECT * FROM t2;
+ID	DATA	DATA2	data3	data4
+1	12345	ABCDEFG	abcdefg	1234567890
+CHECK TABLE t1;
+Table	Op	Msg_type	Msg_text
+test.t1	check	status	OK
+CHECK TABLE t2;
+Table	Op	Msg_type	Msg_text
+test.t2	check	status	OK
+USE information_schema;
+"--smartengine=1, show all smartengine info tables"
+SHOW TABLES like 'SMARTENGINE%';
+Tables_in_information_schema (SMARTENGINE%)
+SMARTENGINE_CFSTATS
+SMARTENGINE_COLUMNS
+SMARTENGINE_COMPACTION_HISTORY
+SMARTENGINE_COMPACTION_STATS
+SMARTENGINE_COMPACTION_TASK
+SMARTENGINE_DBSTATS
+SMARTENGINE_DDL
+SMARTENGINE_DEBUG_INFO
+SMARTENGINE_GLOBAL_INFO
+SMARTENGINE_LOCKS
+SMARTENGINE_MEM_ALLOC
+SMARTENGINE_PERF_CONTEXT
+SMARTENGINE_PERF_CONTEXT_GLOBAL
+SMARTENGINE_QUERY_TRACE
+SMARTENGINE_SUBTABLE
+SMARTENGINE_TABLES
+SMARTENGINE_TABLE_SPACE
+SMARTENGINE_TRX
+DROP TABLE test.t1;
+DROP TABLE test.t2;
+# restart, test --smartengine=0 upgrade
+SHOW DATABASES;
+Database
+information_schema
+mysql
+performance_schema
+sys
+test
+USE test;
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `id` int NOT NULL,
+  `data` char(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_data` (`data`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+SELECT * FROM t1;
+id	data
+1	12345
+CREATE TABLE t2 (ID INT, DATA CHAR(20), DATA2 TEXT, PRIMARY KEY(`ID`), KEY(`DATA`)) ENGINE=SMARTENGINE;
+ERROR 42000: Unknown storage engine 'SMARTENGINE'
+CREATE TABLE t2 (ID INT, DATA CHAR(20), DATA2 TEXT, PRIMARY KEY(`ID`), KEY(`DATA`)) ENGINE=INNODB;
+INSERT INTO t2 VALUES (1,'12345','ABCDEFG');
+SELECT * FROM t2;
+ID	DATA	DATA2
+1	12345	ABCDEFG
+ALTER TABLE t1 ADD COLUMN data2 VARCHAR(100) DEFAULT 'abcdefg', ALGORITHM=INSTANT;
+ALTER TABLE t2 ADD COLUMN data3 VARCHAR(100) DEFAULT 'abcdefg', ALGORITHM=INSTANT;
+ALTER TABLE t1 ADD INDEX k_2(`data2`);
+ALTER TABLE t2 ADD INDEX k_3(`data3`);
+CHECK TABLE t1;
+Table	Op	Msg_type	Msg_text
+test.t1	check	status	OK
+CHECK TABLE t2;
+Table	Op	Msg_type	Msg_text
+test.t2	check	status	OK
+USE information_schema;
+"--smartengine = 0, should have nothing"
+SHOW TABLES LIKE 'SMARTENGINE%';
+Tables_in_information_schema (SMARTENGINE%)
+# restart again, to test recovery with --smartengine=0 
+USE test;
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `id` int NOT NULL,
+  `data` char(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `data2` varchar(100) COLLATE utf8mb4_general_ci DEFAULT 'abcdefg',
+  PRIMARY KEY (`id`),
+  KEY `idx_data` (`data`),
+  KEY `k_2` (`data2`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+SHOW CREATE TABLE t2;
+Table	Create Table
+t2	CREATE TABLE `t2` (
+  `ID` int NOT NULL,
+  `DATA` char(20) DEFAULT NULL,
+  `DATA2` text,
+  `data3` varchar(100) DEFAULT 'abcdefg',
+  PRIMARY KEY (`ID`),
+  KEY `DATA` (`DATA`),
+  KEY `k_3` (`data3`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+SELECT * FROM t1;
+id	data	data2
+1	12345	abcdefg
+SELECT * FROM t2;
+ID	DATA	DATA2	data3
+1	12345	ABCDEFG	abcdefg
+CREATE TABLE t3 (ID INT, DATA CHAR(20), DATA2 TEXT, PRIMARY KEY(`ID`), KEY(`DATA`)) ENGINE=SMARTENGINE;
+ERROR 42000: Unknown storage engine 'SMARTENGINE'
+ALTER TABLE t1 ADD COLUMN data3 VARCHAR(100) DEFAULT '1234567890', ALGORITHM=INSTANT;
+ALTER TABLE t2 ADD COLUMN data4 VARCHAR(100) DEFAULT '1234567890', ALGORITHM=INSTANT;
+ALTER TABLE t1 ADD INDEX k_3(`data3`);
+ALTER TABLE t2 ADD INDEX k_4(`data4`);
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `id` int NOT NULL,
+  `data` char(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `data2` varchar(100) COLLATE utf8mb4_general_ci DEFAULT 'abcdefg',
+  `data3` varchar(100) COLLATE utf8mb4_general_ci DEFAULT '1234567890',
+  PRIMARY KEY (`id`),
+  KEY `idx_data` (`data`),
+  KEY `k_2` (`data2`),
+  KEY `k_3` (`data3`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+SHOW CREATE TABLE t2;
+Table	Create Table
+t2	CREATE TABLE `t2` (
+  `ID` int NOT NULL,
+  `DATA` char(20) DEFAULT NULL,
+  `DATA2` text,
+  `data3` varchar(100) DEFAULT 'abcdefg',
+  `data4` varchar(100) DEFAULT '1234567890',
+  PRIMARY KEY (`ID`),
+  KEY `DATA` (`DATA`),
+  KEY `k_3` (`data3`),
+  KEY `k_4` (`data4`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+SELECT * FROM t1;
+id	data	data2	data3
+1	12345	abcdefg	1234567890
+SELECT * FROM t2;
+ID	DATA	DATA2	data3	data4
+1	12345	ABCDEFG	abcdefg	1234567890
+CHECK TABLE t1;
+Table	Op	Msg_type	Msg_text
+test.t1	check	status	OK
+CHECK TABLE t2;
+Table	Op	Msg_type	Msg_text
+test.t2	check	status	OK
+USE information_schema;
+"--smartengine = 0, should have nothing"
+SHOW TABLES LIKE 'SMARTENGINE%';
+Tables_in_information_schema (SMARTENGINE%)
+# restart again, to test upgrade from --smartengine=0 to --smartengine=1 
+USE test;
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `id` int NOT NULL,
+  `data` char(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `data2` varchar(100) COLLATE utf8mb4_general_ci DEFAULT 'abcdefg',
+  `data3` varchar(100) COLLATE utf8mb4_general_ci DEFAULT '1234567890',
+  PRIMARY KEY (`id`),
+  KEY `idx_data` (`data`),
+  KEY `k_2` (`data2`),
+  KEY `k_3` (`data3`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+SHOW CREATE TABLE t2;
+Table	Create Table
+t2	CREATE TABLE `t2` (
+  `ID` int NOT NULL,
+  `DATA` char(20) DEFAULT NULL,
+  `DATA2` text,
+  `data3` varchar(100) DEFAULT 'abcdefg',
+  `data4` varchar(100) DEFAULT '1234567890',
+  PRIMARY KEY (`ID`),
+  KEY `DATA` (`DATA`),
+  KEY `k_3` (`data3`),
+  KEY `k_4` (`data4`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+SELECT * FROM t1;
+id	data	data2	data3
+1	12345	abcdefg	1234567890
+SELECT * FROM t2;
+ID	DATA	DATA2	data3	data4
+1	12345	ABCDEFG	abcdefg	1234567890
+CREATE TABLE t3 (ID INT, DATA CHAR(20), DATA2 TEXT, PRIMARY KEY(`ID`), KEY(`DATA`)) ENGINE=SMARTENGINE;
+INSERT INTO t3 values(1, '12345', 'abcdefg');
+ALTER TABLE t3 ADD COLUMN DATA3 VARCHAR(100) DEFAULT '!@#$%^&*';
+ALTER TABLE t3 ADD INDEX key_3 (`DATA3`);
+SHOW CREATE TABLE t3;
+Table	Create Table
+t3	CREATE TABLE `t3` (
+  `ID` int NOT NULL,
+  `DATA` char(20) COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `DATA2` text COLLATE utf8mb4_general_ci,
+  `DATA3` varchar(100) COLLATE utf8mb4_general_ci DEFAULT '!@#$%^&*',
+  PRIMARY KEY (`ID`),
+  KEY `DATA` (`DATA`),
+  KEY `key_3` (`DATA3`)
+) ENGINE=SMARTENGINE DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+SELECT * FROM t3;
+ID	DATA	DATA2	DATA3
+1	12345	abcdefg	!@#$%^&*
+USE information_schema;
+"--smartengine=1 should have smartengine info tables"
+SHOW TABLES LIKE 'SMARTENGINE%';
+Tables_in_information_schema (SMARTENGINE%)
+SMARTENGINE_CFSTATS
+SMARTENGINE_COLUMNS
+SMARTENGINE_COMPACTION_HISTORY
+SMARTENGINE_COMPACTION_STATS
+SMARTENGINE_COMPACTION_TASK
+SMARTENGINE_DBSTATS
+SMARTENGINE_DDL
+SMARTENGINE_DEBUG_INFO
+SMARTENGINE_GLOBAL_INFO
+SMARTENGINE_LOCKS
+SMARTENGINE_MEM_ALLOC
+SMARTENGINE_PERF_CONTEXT
+SMARTENGINE_PERF_CONTEXT_GLOBAL
+SMARTENGINE_QUERY_TRACE
+SMARTENGINE_SUBTABLE
+SMARTENGINE_TABLES
+SMARTENGINE_TABLE_SPACE
+SMARTENGINE_TRX
+SELECT DISTINCT(SUBTABLE_ID), TABLE_NAME, SUBTABLE_NAME FROM information_schema.SMARTENGINE_SUBTABLE WHERE TABLE_NAME NOT LIKE 'mysql.%';
+SUBTABLE_ID	TABLE_NAME	SUBTABLE_NAME
+#	<internal>	__system__
+#	<internal>	default
+#	test.t3	DATA
+#	test.t3	PRIMARY
+#	test.t3	key_3
+DROP TABLE test.t1;
+DROP TABLE test.t2;
+# restart:

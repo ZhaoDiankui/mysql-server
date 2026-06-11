@@ -1,0 +1,4 @@
+#include "build_version.h"
+const char* smartengine_build_git_sha = "smartengine_build_git_sha:@@GIT_SHA@@";
+const char* smartengine_build_git_date = "smartengine_build_git_date:@@GIT_DATE_TIME@@";
+const char* smartengine_build_compile_date = __DATE__;

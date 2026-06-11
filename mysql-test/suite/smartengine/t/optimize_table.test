@@ -1,0 +1,10 @@
+--source suite/smartengine/include/have_smartengine.inc
+
+# 
+# OPTIMIZE TABLE statements
+#
+
+--source include/big_test.inc
+--source optimize_table.inc
+
+--source suite/smartengine/include/check_smartengine_log_error.inc

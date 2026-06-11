@@ -1,0 +1,5 @@
+#### suite/smartengine_ext/t/innodb_storedproc_07.test
+
+let $engine_type = SMARTENGINE;
+
+--source suite/smartengine_ext/storedproc/storedproc_07.inc

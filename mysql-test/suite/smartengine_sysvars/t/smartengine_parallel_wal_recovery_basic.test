@@ -1,0 +1,8 @@
+--source suite/smartengine/include/have_smartengine.inc
+
+--let $sys_var=SMARTENGINE_PARALLEL_WAL_RECOVERY
+--let $read_only=1
+--let $session=0
+--let $sticky=1
+--source ../inc/smartengine_sys_var.inc
+

@@ -1,0 +1,12 @@
+--source suite/smartengine/include/have_smartengine.inc
+
+--disable_warnings
+DROP DATABASE IF EXISTS test_drop_database;
+--enable_warnings
+
+CREATE DATABASE test_drop_database;
+CREATE TABLE t1 (a int, b int, c int, primary key (a), unique key (b)) ENGINE=SMARTENGINE;
+ALTER TABLE t1 DROP PRIMARY KEY, ADD PRIMARY KEY (a);
+DROP TABLE t1;
+DROP DATABASE test_drop_database;
+--source suite/smartengine/include/check_smartengine_log_error.inc

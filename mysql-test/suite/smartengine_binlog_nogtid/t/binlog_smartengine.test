@@ -1,0 +1,4 @@
+--source include/have_log_bin.inc
+--source suite/smartengine_binlog_gtid/include/binlog_smartengine.inc
+
+--echo End of tests

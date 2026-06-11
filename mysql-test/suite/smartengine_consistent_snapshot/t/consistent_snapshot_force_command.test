@@ -1,0 +1,36 @@
+#
+# Test for consistent snapshot from object store
+#
+--echo # Wait for at least 1 snapshots to be generated 
+let $wait_condition= SELECT count(*) =1 FROM INFORMATION_SCHEMA.SNAPSHOT_PERSISTENT_SNAPSHOT_INDEX;
+--source include/wait_condition_or_abort.inc
+
+CREATE DATABASE db1;
+CREATE TABLE t1(c1 int) ENGINE=SMARTENGINE ;
+INSERT INTO t1 values(1);
+INSERT INTO t1 values(2);
+INSERT INTO t1 values(3);
+INSERT INTO t1 values(4);
+
+SELECT SNAPSHOT_ARCHIVE_PERSISTENT_FORCE();
+--echo # Wait for at least 2 snapshots to be generated 
+let $wait_condition= SELECT count(*) =2 FROM INFORMATION_SCHEMA.SNAPSHOT_PERSISTENT_SNAPSHOT_INDEX;
+--source include/wait_condition_or_abort.inc
+
+INSERT INTO t1 SELECT * FROM t1;
+
+SELECT SNAPSHOT_ARCHIVE_PERSISTENT_FORCE();
+--echo # Wait for at least 3 snapshots to be generated 
+--let $wait_condition= SELECT count(*) =3 FROM INFORMATION_SCHEMA.SNAPSHOT_PERSISTENT_SNAPSHOT_INDEX
+--source include/wait_condition_or_abort.inc
+
+INSERT INTO t1 SELECT * FROM t1;
+
+SELECT SNAPSHOT_ARCHIVE_PERSISTENT_FORCE();
+--echo # Wait for at least 4 snapshots to be generated 
+--let $wait_condition= SELECT count(*) =4 FROM INFORMATION_SCHEMA.SNAPSHOT_PERSISTENT_SNAPSHOT_INDEX
+--source include/wait_condition_or_abort.inc
+
+--echo # Cleanup
+DROP TABLE t1;
+DROP DATABASE db1;

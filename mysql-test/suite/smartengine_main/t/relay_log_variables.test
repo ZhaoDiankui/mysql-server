@@ -1,0 +1,4 @@
+--replace_result $MYSQLTEST_VARDIR MYSQLTEST_VARDIR
+--query_vertical SHOW VARIABLES LIKE 'relay_log%'
+
+--source suite/smartengine/include/check_smartengine_log_error.inc

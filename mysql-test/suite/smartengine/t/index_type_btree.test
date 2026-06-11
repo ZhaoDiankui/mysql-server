@@ -1,0 +1,13 @@
+--source suite/smartengine/include/have_smartengine.inc
+
+#
+# Index type BTREE
+#
+
+let $index_type = BTREE;
+
+--source index.inc
+
+let $index_type =;
+
+--source suite/smartengine/include/check_smartengine_log_error.inc

@@ -1,0 +1,48 @@
+# Issue: https://github.com/apecloud/wesql-server/issues/366
+# The primary key scanning performance of the smartengine is poor,
+# because of wrong execution plan.
+#
+--source suite/smartengine/include/have_smartengine.inc
+
+--disable_warnings
+DROP TABLE IF EXISTS t1;
+--enable_warnings
+
+#### preapre table data
+CREATE TABLE t1 (
+  id int NOT NULL AUTO_INCREMENT,
+  k int NOT NULL DEFAULT '0',
+  c char(120) COLLATE utf8mb4_general_ci NOT NULL DEFAULT '',
+  pad char(60) COLLATE utf8mb4_general_ci NOT NULL DEFAULT '',
+  PRIMARY KEY (id),
+  KEY k_1 (k)) ENGINE = SMARTENGINE;
+
+SHOW CREATE TABLE t1;
+
+--disable_query_log
+let $i=1;
+while ($i <= 10000)
+{
+  inc $i;
+  eval INSERT INTO t1 (k, c, pad) VALUES ($i, REPEAT('zds', 30), REPEAT('ppl', 10));
+}
+
+set global smartengine_flush_memtable=on;
+
+--enable_query_log
+
+--disable_warnings
+select count(*) from t1;
+
+#### expect join type is 'range'
+--replace_column 11 #
+explain select id from t1 where id >= 3000 order by id asc limit 1;
+
+select id from t1 where id >= 3000 order by id asc limit 1;
+--enable_warnings
+
+#### cleanup
+DROP TABLE t1;
+--source suite/smartengine/include/check_smartengine_log_error.inc
+
+

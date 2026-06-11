@@ -1,0 +1,5 @@
+let $engine_type= InnoDB;
+
+--source include/loaddata_autocom.inc
+
+--source suite/smartengine/include/check_smartengine_log_error.inc

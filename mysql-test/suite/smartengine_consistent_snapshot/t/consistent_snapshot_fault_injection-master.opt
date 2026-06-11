@@ -1,0 +1,2 @@
+--initialize=--objectstore-region=$MYSQL_TMP_DIR
+--log-error=$MYSQLTEST_VARDIR/tmp/consistent_snapshot_fault_injection.err

@@ -1,0 +1,80 @@
+#
+# Test for repo_objectstore_id
+#
+--source suite/smartengine/include/have_smartengine.inc
+
+--let $MYSQLD_DIR=`select @@datadir`
+--let $region = `select @@objectstore_region`
+--let $bucket = `select @@objectstore_bucket`
+--let $objectstore_id=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+--let $branch = `select @@branch_objectstore_id`
+
+--exec echo "wait" > $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
+--shutdown_server 100
+--source include/wait_until_disconnected.inc
+--enable_reconnect
+--exec echo "restart: --repo_objectstore_id=$objectstore_id" > $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
+--source include/wait_until_connected_again.inc
+
+--exec echo "wait" > $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
+--shutdown_server 100
+--source include/wait_until_disconnected.inc
+--enable_reconnect
+
+--echo Starting the server with inconsisted objectstore id
+--let MYSQLD_LOG=$MYSQL_TMP_DIR/wrong_objectstore_id.log
+--error 1
+--exec $MYSQLD --defaults-file=$MYSQLTEST_VARDIR/my.cnf --defaults-group-suffix=.1 --serverless=true --log_error_verbosity=3 --repo_objectstore_id=yyyyyyyy-yyyy-yyyy-yyyy-yyyyyyyyyyy >$MYSQLD_LOG 2>&1
+--let $grep_file=$MYSQLD_LOG
+--let $grep_pattern=Failed to verify the ID of data directory in the object store
+--let $grep_output= print_count
+--source include/grep_pattern.inc
+--remove_file $MYSQLD_LOG
+
+--echo Starting the server when data.lock does not exist
+--let MYSQLD_LOG=$MYSQL_TMP_DIR/no_objectstore_id.log
+--echo # Remove objectsotre lock file data.lock
+--remove_file $MYSQLD_DIR/$region/$bucket/$objectstore_id/$branch/data.lock
+--error 1
+--exec $MYSQLD --defaults-file=$MYSQLTEST_VARDIR/my.cnf --defaults-group-suffix=.1 --serverless=true --log_error_verbosity=3  >$MYSQLD_LOG 2>&1
+--let $grep_file=$MYSQLD_LOG
+--let $grep_pattern=lock file should exist but not
+--let $grep_output= print_count
+--source include/grep_pattern.inc
+--remove_file $MYSQLD_LOG
+
+--echo Starting the server when data.lock exists
+--echo # Touch objectsotre lock file data.lock
+write_file $MYSQLD_DIR/$region/$bucket/$objectstore_id/$branch/data.lock;
+EOF
+--exec echo "restart" > $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
+--source include/wait_until_connected_again.inc
+
+--echo Initialize the data directory with data.lock
+
+--let MYSQLD_DIR=$MYSQL_TMP_DIR/objectstore_lock_test
+--let MYSQLD_LOG=$MYSQL_TMP_DIR/objectstore_lock.log
+--let $region=.local_region
+--let $bucket=local_bucket
+--let $objectstore_id=zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz
+
+--echo # Create an empty data directory with data.lock...
+--mkdir $MYSQLD_DIR
+--mkdir $MYSQLD_DIR/$region
+--mkdir $MYSQLD_DIR/$region/$bucket
+--mkdir $MYSQLD_DIR/$region/$bucket/$objectstore_id
+--mkdir $MYSQLD_DIR/$region/$bucket/$objectstore_id/$branch
+write_file $MYSQLD_DIR/$region/$bucket/$objectstore_id/$branch/data.lock;
+EOF
+
+--error 1
+--exec $MYSQLD --defaults-file=$MYSQLTEST_VARDIR/my.cnf --defaults-group-suffix=.1 --initialize-insecure --datadir=$MYSQLD_DIR --serverless=true --objectstore_region=$region --objectstore_bucket=$bucket --repo_objectstore_id=$objectstore_id --log_error_verbosity=3 >$MYSQLD_LOG 2>&1
+--let $grep_file=$MYSQLD_LOG
+--let $grep_pattern=lock file should not exist
+--let $grep_output= print_count
+--source include/grep_pattern.inc
+
+--remove_file $MYSQLD_LOG
+--force-rmdir $MYSQLD_DIR
+
+#Cleanup

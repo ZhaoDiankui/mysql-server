@@ -1,0 +1,2 @@
+--smartengine_memtable_size=16k
+--smartengine_compression_per_level=kNoCompression

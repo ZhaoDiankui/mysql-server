@@ -1,0 +1,5 @@
+#### suite/smartengine_ext/t/innodb_trig_08.test
+
+let $engine_type = SMARTENGINE;
+
+--source suite/smartengine_ext/triggers/triggers_08.inc

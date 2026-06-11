@@ -1,0 +1,1 @@
+--source suite/smartengine_rpl_gtid/include/rpl_split_statements_debug.inc

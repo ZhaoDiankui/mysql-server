@@ -1,0 +1,8 @@
+--source suite/smartengine/include/have_smartengine.inc
+
+let $skip_unique_check = 0;
+--source loaddata.inc
+let $skip_unique_check = 1;
+set session unique_checks=0;
+--source loaddata.inc
+--source suite/smartengine/include/check_smartengine_log_error.inc

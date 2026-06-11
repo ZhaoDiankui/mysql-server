@@ -1,0 +1,1 @@
+--loose-smartengine-strict-collation-check=off --transaction-isolation=READ-COMMITTED

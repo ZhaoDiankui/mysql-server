@@ -1,0 +1,48 @@
+--disable_query_log
+call mtr.add_suppression(".*SMARTENGINE: Failed to parse input compress_opts");
+call mtr.add_suppression(".*Plugin 'SMARTENGINE' init function returned error.");
+call mtr.add_suppression(".*Plugin 'SMARTENGINE' registration as a STORAGE ENGINE failed.");
+call mtr.add_suppression(".*Plugin 'SMARTENGINE_.*' init function returned error.");
+call mtr.add_suppression(".*Plugin 'SMARTENGINE_.*' registration as a INFORMATION SCHEMA failed.");
+--enable_query_log
+
+SHOW STORAGE ENGINES;
+
+USE information_schema;
+SHOW TABLES LIKE 'SMARTENGINE%';
+
+--let $assert_file=$MYSQLTEST_VARDIR/log/mysqld.1.err
+--let $assert_text=Found SMARTENGINE human-made error
+--let $assert_select= .*SE: Failed to parse input compress_opts
+--let $assert_count= 1
+--let $assert_only_after= CURRENT_TEST: smartengine.smartengine_failed_and_check_is
+--source include/assert_grep.inc
+
+--let $assert_file=$MYSQLTEST_VARDIR/log/mysqld.1.err
+--let $assert_text=Found SMARTENGINE init failed
+--let $assert_select= .*Plugin 'SMARTENGINE' init function returned error.
+--let $assert_count= 1
+--let $assert_only_after= CURRENT_TEST: smartengine.smartengine_failed_and_check_is
+--source include/assert_grep.inc
+
+--let $assert_file=$MYSQLTEST_VARDIR/log/mysqld.1.err
+--let $assert_text=Found SMARTENGINE register failed
+--let $assert_select= .*Plugin 'SMARTENGINE' registration as a STORAGE ENGINE failed.
+--let $assert_count= 1
+--let $assert_only_after= CURRENT_TEST: smartengine.smartengine_failed_and_check_is
+--source include/assert_grep.inc
+
+--let $assert_file=$MYSQLTEST_VARDIR/log/mysqld.1.err
+--let $assert_text=Found SMARTENGINE information_schema table ERROR log for 18 times.
+--let $assert_select= .*Plugin 'SMARTENGINE_.*' init function returned error.
+--let $assert_count= 18
+--let $assert_only_after= CURRENT_TEST: smartengine.smartengine_failed_and_check_is
+--source include/assert_grep.inc
+
+--let $assert_file=$MYSQLTEST_VARDIR/log/mysqld.1.err
+--let $assert_text=Found SMARTENGINE information_schema table plugin register failed log for 18 times.
+--let $assert_select= .*Plugin 'SMARTENGINE_.*' registration as a INFORMATION SCHEMA failed.
+--let $assert_count= 18
+--let $assert_only_after= CURRENT_TEST: smartengine.smartengine_failed_and_check_is
+--source include/assert_grep.inc
+--source suite/smartengine/include/check_smartengine_log_error.inc

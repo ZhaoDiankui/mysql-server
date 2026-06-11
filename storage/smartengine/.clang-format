@@ -1,0 +1,33 @@
+---
+IndentWidth: 2
+ColumnLimit: 150
+PenaltyReturnTypeOnItsOwnLine: 2000000
+PenaltyExcessCharacter: 1000000
+PenaltyBreakAssignment: 1000000
+PenaltyBreakBeforeFirstCallParameter: 10000000
+AlwaysBreakAfterReturnType: None
+PointerAlignment: Right
+AccessModifierOffset: -2
+BreakConstructorInitializers: BeforeColon
+ConstructorInitializerAllOnOneLineOrOnePerLine: true
+AlignAfterOpenBracket: true
+AllowAllParametersOfDeclarationOnNextLine: false
+AllowAllArgumentsOnNextLine: false
+BinPackParameters: false
+BinPackArguments: false
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterClass: true
+  AfterStruct: true
+  AfterFunction: true
+  AfterUnion: true
+  AfterEnum: true
+  AfterNamespace: false
+
+IncludeCategories:
+  - Regex:           '^<.*\.h>'
+    Priority:        1
+  - Regex:           '^<.*'
+    Priority:        2
+  - Regex:           '.*'
+    Priority:        3

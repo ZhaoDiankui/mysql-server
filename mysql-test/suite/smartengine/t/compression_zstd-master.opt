@@ -1,0 +1,2 @@
+--smartengine_compression_per_level=kZSTD
+--smartengine_compression_options=-14:4:0

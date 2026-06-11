@@ -1,0 +1,50 @@
+include/master-slave.inc
+Warnings:
+Note	####	Sending passwords in plain text without SSL/TLS is extremely insecure.
+Note	####	Storing MySQL user name or password information in the connection metadata repository is not secure and is therefore not recommended. Please consider using the USER and PASSWORD connection options for START REPLICA; see the 'START REPLICA Syntax' in the MySQL Manual for more information.
+[connection master]
+call mtr.add_suppression(".*Cannot replicate.*purged required binary logs.*");
+######## Initialize ########
+CREATE TABLE t1 (a INT);
+include/sync_slave_sql_with_master.inc
+include/stop_slave.inc
+include/stop_dump_threads.inc
+INSERT INTO t1 VALUES (1);
+FLUSH LOGS;
+INSERT INTO t1 VALUES (2);
+PURGE BINARY LOGS TO 'master-bin.000002';
+include/assert.inc [PURGE BINARY LOGS successfully removed all but the latest files]
+INSERT INTO t1 VALUES (2);
+CHANGE MASTER TO MASTER_AUTO_POSITION = 1;
+Warnings:
+Warning	1287	'CHANGE MASTER' is deprecated and will be removed in a future release. Please use CHANGE REPLICATION SOURCE instead
+Warning	1287	'MASTER_AUTO_POSITION' is deprecated and will be removed in a future release. Please use SOURCE_AUTO_POSITION instead
+START SLAVE;
+Warnings:
+Warning	1287	'START SLAVE' is deprecated and will be removed in a future release. Please use START REPLICA instead
+include/wait_for_slave_io_error.inc [errno=13114 # ER_SERVER_SOURCE_FATAL_ERROR_READING_BINLOG]
+include/stop_slave_sql.inc
+CHANGE MASTER TO MASTER_LOG_FILE = 'master-bin.000002', MASTER_LOG_POS = MASTER_POS, MASTER_AUTO_POSITION = 0;
+Warnings:
+Warning	1287	'CHANGE MASTER' is deprecated and will be removed in a future release. Please use CHANGE REPLICATION SOURCE instead
+Warning	1287	'MASTER_LOG_FILE' is deprecated and will be removed in a future release. Please use SOURCE_LOG_FILE instead
+Warning	1287	'MASTER_LOG_POS' is deprecated and will be removed in a future release. Please use SOURCE_LOG_POS instead
+Warning	1287	'MASTER_AUTO_POSITION' is deprecated and will be removed in a future release. Please use SOURCE_AUTO_POSITION instead
+include/start_slave.inc
+include/assert.inc [t1 should contain only one row with the value 2]
+######## Clean up ########
+=== Stop and reset slave/master (connection slave) ====
+include/stop_slave.inc
+RESET MASTER;
+RESET SLAVE;
+Warnings:
+Warning	1287	'RESET SLAVE' is deprecated and will be removed in a future release. Please use RESET REPLICA instead
+=== Stop and reset master (connection master) ====
+RESET MASTER;
+=== Start slave (connection slave) ====
+include/start_slave.inc
+=== Sync slave with master (connection master/slave) ====
+DROP TABLE t1;
+include/sync_slave_sql_with_master.inc
+include/assert_grep.inc [Found warning containing lost GTIDs]
+include/rpl_end.inc

@@ -1,0 +1,6 @@
+!include suite/smartengine_consistent_snapshot/my.cnf
+
+[mysqld]
+repo_objectstore_id=     'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
+snapshot_archive_smartengine_tar_mode='TAR'
+snapshot_archive_innodb_tar_mode='TAR'

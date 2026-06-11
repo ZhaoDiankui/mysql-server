@@ -1,0 +1,83 @@
+name: Delete Self Runner Name
+description: 'Delete the specified Self Runner Name.'
+
+inputs:
+  runner-name:
+    description: 'The self runner name to be deleted.'
+    required: true
+    type: string
+  runner-namespace:
+    description: 'The self runner namespace to be deleted.'
+    required: false
+    type: string
+  github-token:
+    description: 'The github token.'
+    required: true
+    type: string
+  access-key-id:
+    description: 'The access key id'
+    required: true
+    type: string
+  secret-access-key:
+    description: 'The secret access key'
+    required: true
+    type: string
+
+
+runs:
+  using: composite
+  steps:
+    - name: Checkout apecloud-cd
+      uses: actions/checkout@v4
+      with:
+        repository: apecloud-inc/apecloud-cd
+        path: ./apecloud-cd
+
+    - name: remove self runner
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        RUNNER_NAME: ${{ inputs.runner-name }}
+      run: |
+        cd apecloud-cd
+        bash .github/utils/utils.sh --type 25 \
+            --github-token "${{ env.GITHUB_TOKEN }}" \
+            --github-repo "${{ github.repository }}" \
+            --runner-name "${{ env.RUNNER_NAME }}"
+
+    - uses: azure/setup-kubectl@v3
+      with:
+        version: "v1.28.3"
+
+    - uses: aws-actions/setup-sam@v2
+      with:
+        use-installer: true
+
+    - uses: aws-actions/configure-aws-credentials@v4
+      env:
+        AWS_REGION: "ap-northeast-1"
+      with:
+        aws-access-key-id: ${{ inputs.access-key-id }}
+        aws-secret-access-key: ${{ inputs.secret-access-key }}
+        aws-region: "${{ env.AWS_REGION }}"
+
+    - name: delete self runner pod
+      shell: bash
+      env:
+        RUNNER_NAME: ${{ inputs.runner-name }}
+        RUNNER_NAMESPACE: ${{ inputs.runner-namespace }}
+        AWS_REGION: "ap-northeast-1"
+        AWS_CLUSTER: "foxlake-dev-001"
+      run: |
+        RUNNER_NAMESPACE="${{ env.RUNNER_NAMESPACE }}"
+        if [[ -z "${{ env.RUNNER_NAMESPACE }}" ]]; then
+            RUNNER_NAMESPACE="github-runner"
+        fi
+        
+        aws eks --region ${{ env.AWS_REGION }} update-kubeconfig --name ${{ env.AWS_CLUSTER }} \
+            --role-arn $(aws iam get-role --role-name ${{ env.AWS_CLUSTER }}-admin-role --query 'Role.Arn' --output text)
+
+        runner_pod_exists=$(kubectl get pod -n "${RUNNER_NAMESPACE}" | (grep "${{ env.RUNNER_NAME }}"||true))
+        if [[ -n "${runner_pod_exists}" ]]; then
+            kubectl delete pod -n "${RUNNER_NAMESPACE}" "${{ env.RUNNER_NAME }}" --force
+        fi

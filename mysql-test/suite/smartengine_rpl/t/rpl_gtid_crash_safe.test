@@ -1,0 +1,8 @@
+-- source suite/smartengine_rpl/include/have_smartengine.inc
+-- source suite/smartengine_rpl/include/have_gtid.inc
+-- source include/master-slave.inc
+-- source include/have_debug.inc
+-- source include/not_valgrind.inc
+-- source include/have_binlog_format_row.inc
+
+-- source suite/smartengine_rpl/include/rpl_gtid_crash_safe.inc

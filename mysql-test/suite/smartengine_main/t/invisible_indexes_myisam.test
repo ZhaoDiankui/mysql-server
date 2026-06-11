@@ -1,0 +1,6 @@
+--source include/force_myisam_default.inc
+
+--source include/invisible_indexes.inc
+
+
+--source suite/smartengine/include/check_smartengine_log_error.inc

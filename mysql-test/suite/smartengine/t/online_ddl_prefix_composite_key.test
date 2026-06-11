@@ -1,0 +1,11 @@
+--source suite/smartengine/include/have_smartengine.inc
+--source include/have_debug.inc
+
+--echo # Establish another connection (user=root) for concurrent DML
+connect (dml,localhost,root,,);
+connection default;
+
+--let $test_file=suite/smartengine/t/online_ddl_prefix_composite_key.inc
+--source suite/smartengine/include/smartengine_full_charset.inc
+
+--source suite/smartengine/include/check_smartengine_log_error.inc

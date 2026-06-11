@@ -1,0 +1,50 @@
+DROP TABLE IF EXISTS t1;
+CREATE TABLE t1 (c1 int primary key, c2 int);
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `c1` int NOT NULL,
+  `c2` int DEFAULT NULL,
+  PRIMARY KEY (`c1`)
+) ENGINE=SMARTENGINE DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+DROP TABLE t1;
+CREATE TABLE t1 (c1 int primary key, c2 int) ENGINE = INNODB;
+Warnings:
+Warning	7513	Force change storage engine from INNODB to smartengine in serveless mode
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `c1` int NOT NULL,
+  `c2` int DEFAULT NULL,
+  PRIMARY KEY (`c1`)
+) ENGINE=SMARTENGINE DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+DROP TABLE t1;
+CREATE TABLE t1 (c1 varchar(10) primary key, c2 char(2)) ENGINE = INNODB CHARSET=BIG5;
+ERROR HY000: Unsupported collation on string indexed column c1. Consider change to other collation (binary, gbk_bin, gbk_chinese_ci, latin1_bin, utf8mb3_bin, utf8mb3_general_ci, utf8mb4_0900_ai_ci, utf8mb4_bin, utf8mb4_general_ci).
+SHOW VARIABLES LIKE "default_storage_engine";
+Variable_name	Value
+default_storage_engine	SMARTENGINE
+SET default_storage_engine = INNODB;
+Warnings:
+Warning	7513	Force change default storage engine from INNODB to smartengine in serveless mode
+CREATE TABLE t1 (c1 int primary key, c2 int);
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `c1` int NOT NULL,
+  `c2` int DEFAULT NULL,
+  PRIMARY KEY (`c1`)
+) ENGINE=SMARTENGINE DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+DROP TABLE t1;
+SET GLOBAL default_storage_engine = INNODB;
+Warnings:
+Warning	7513	Force change default storage engine from INNODB to smartengine in serveless mode
+CREATE TABLE t1 (c1 int primary key, c2 int);
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `c1` int NOT NULL,
+  `c2` int DEFAULT NULL,
+  PRIMARY KEY (`c1`)
+) ENGINE=SMARTENGINE DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+DROP TABLE t1;

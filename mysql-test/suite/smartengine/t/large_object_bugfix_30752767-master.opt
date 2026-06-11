@@ -1,0 +1,2 @@
+--max_allowed_packet=500M
+--smartengine_total_wal_size=10M

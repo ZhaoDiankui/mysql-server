@@ -1,0 +1,9 @@
+--source include/no_valgrind_without_big.inc
+
+set optimizer_switch='batched_key_access=on,block_nested_loop=off,mrr_cost_based=off';
+
+--source suite/smartengine_main/include/join_cache.inc
+
+set optimizer_switch = default;
+
+--source suite/smartengine/include/check_smartengine_log_error.inc

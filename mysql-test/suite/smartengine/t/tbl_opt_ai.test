@@ -1,0 +1,30 @@
+--source suite/smartengine/include/have_smartengine.inc
+
+# 
+# Check whether AUTO_INCREMENT option 
+# is supported in CREATE and ALTER TABLE
+#
+
+--disable_warnings
+DROP TABLE IF EXISTS t1;
+--enable_warnings
+
+CREATE TABLE t1 (a INT AUTO_INCREMENT PRIMARY KEY) ENGINE = SMARTENGINE AUTO_INCREMENT=10;
+SHOW CREATE TABLE t1;
+INSERT INTO t1 VALUES (NULL);
+SELECT * FROM t1;
+
+ALTER TABLE t1 AUTO_INCREMENT=100;
+SHOW CREATE TABLE t1;
+INSERT INTO t1 VALUES (NULL);
+SELECT * FROM t1 ORDER BY a;
+
+ALTER TABLE t1 AUTO_INCREMENT=50;
+SHOW CREATE TABLE t1;
+INSERT INTO t1 VALUES (NULL);
+SELECT * FROM t1 ORDER BY a;
+
+DROP TABLE t1;
+
+
+--source suite/smartengine/include/check_smartengine_log_error.inc

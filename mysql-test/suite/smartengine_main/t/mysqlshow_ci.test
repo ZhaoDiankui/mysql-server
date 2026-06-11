@@ -1,0 +1,5 @@
+--source include/have_case_insensitive_file_system.inc
+--source suite/smartengine_main/include/mysqlshow.inc
+
+
+--source suite/smartengine/include/check_smartengine_log_error.inc

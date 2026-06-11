@@ -1,0 +1,26 @@
+##############################################################################
+#
+# List the test cases in smartengine that are to be disabled when run in serverless mode.
+#
+# Separate the test case name and the comment with ':'.
+#   <suite>.<test> [@platform|@!platform] : <BUG|WL>#<XXXX> [<comment>]
+#
+# Note:
+#   - Do not use any TAB characters for whitespace.
+#   - Length of a comment section must not be more than 80 characters.
+#
+##############################################################################
+# smartengine
+smartengine.smartengine_i_s                     : WL#41 Can't run in serverless mode
+smartengine.inplace_upgrade                     : WL#41 Can't run in serverless mode
+smartengine.create_table_charset_utf8mb4        : WL#41 Can't run in serverless mode
+smartengine.smartengine_failed_and_check_is     : WL#41 Can't run in serverless mode
+smartengine.tbl_standard_opts                   : WL#41 Can't run in serverless mode 
+smartengine.smartengine_icp                     : WL#41 Can't run in serverless mode
+smartengine.online_ddl_stage_no_pk_text         : WL#41 Can't run in serverless mode
+smartengine.smartengine_hotbackup               : WL#41 Can't run in serverless mode
+smartengine.online_ddl_stage_no_pk_big_varchar  : WL#42 Timeout in serverless mode
+smartengine.online_ddl_stage_with_pk_text       : WL#42 Timeout in serverless mode
+smartengine.online_ddl_stage_with_pk_big_varchar : WL#42 Timeout in serverless mode
+smartengine.large_object_zstd                   : WL#42 Timeout in serverless mode
+smartengine.large_object                        : WL#42 Timeout in serverless mode

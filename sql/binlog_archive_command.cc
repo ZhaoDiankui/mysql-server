@@ -1,0 +1,109 @@
+/*
+  Portions Copyright (c) 2024, ApeCloud Inc Holding Limited 
+  Portions Copyright (c) 2009, 2023, Oracle and/or its affiliates.
+
+   This program is free software; you can redistribute it and/or modify
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
+
+   This program is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License, version 2.0, for more details.
+
+   You should have received a copy of the GNU General Public License
+   along with this program; if not, write to the Free Software
+   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA */
+
+#include "sql/binlog_archive_command.h"
+
+#include "m_string.h"
+#include "my_dbug.h"
+#include "mysqld_error.h"
+#include "sql/binlog_archive.h"
+#include "sql/sql_class.h"
+
+bool Binlog_archive_command::init() {
+  DBUG_TRACE;
+
+  Udf_data udf(m_udf_name, STRING_RESULT, Binlog_archive_command::binlog_purge,
+               Binlog_archive_command::binlog_purge_init,
+               Binlog_archive_command::binlog_purge_deinit);
+
+  m_initialized = !register_udf(udf);
+  return !m_initialized;
+}
+
+bool Binlog_archive_command::deinit() {
+  DBUG_TRACE;
+
+  if (m_initialized && !unregister_udf(m_udf_name)) {
+    m_initialized = false;
+  }
+
+  return m_initialized;
+}
+
+char *Binlog_archive_command::binlog_purge(UDF_INIT *, UDF_ARGS *args,
+                                           char *result, unsigned long *length,
+                                           unsigned char *,
+                                           unsigned char *error) {
+  DBUG_TRACE;
+  Binlog_archive *binlog_archive = Binlog_archive::get_instance();
+  *error = 0;
+  auto err_val{0};
+  std::string err_msg{};                                  // error message
+  std::string log_file(args->args[0], args->lengths[0]);  // binlog file name
+
+  if (!binlog_archive) {
+    *error = 1;
+    err_msg.assign("binlog archive  is not started.");
+    goto err;
+  }
+
+  std::tie(err_val, err_msg) =
+      binlog_archive->purge_logs(log_file.c_str());
+  if (err_val) {
+    *error = err_val;
+    my_error(ER_UDF_ERROR, MYF(0), m_udf_name, err_msg.c_str());
+  } else {
+    err_msg.assign("Purge binlog persistent files successfully");
+  }
+
+err:
+  strcpy(result, err_msg.c_str());
+  *length = err_msg.length();
+  return result;
+}
+
+bool Binlog_archive_command::binlog_purge_init(UDF_INIT *init_id,
+                                               UDF_ARGS *args, char *message) {
+  DBUG_TRACE;
+  if (args->arg_count != 1) {
+    my_stpcpy(message,
+              "Wrong arguments: You need to specify correct arguments.");
+    return true;
+  }
+  if (args->arg_type[0] != STRING_RESULT) {
+    my_stpcpy(message,
+              "Wrong arguments: You need to specify binlog file name.");
+    return true;
+  }
+
+  if (Udf_charset_service::set_return_value_charset(init_id) ||
+      Udf_charset_service::set_args_charset(args)) {
+    return true;
+  }
+
+  init_id->maybe_null = false;
+  return false;
+}
+
+void Binlog_archive_command::binlog_purge_deinit(UDF_INIT *) { DBUG_TRACE; }

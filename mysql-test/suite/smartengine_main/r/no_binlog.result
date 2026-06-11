@@ -1,0 +1,19 @@
+SHOW BINARY LOGS;
+ERROR HY000: You are not using binary logging
+#
+# Verify that The log-slave-updates and slave-preserve-commit-order
+# are disabled if binary log is disabled.
+#
+SELECT @@GLOBAL.log_bin;
+@@GLOBAL.log_bin
+0
+SELECT @@GLOBAL.log_slave_updates;
+@@GLOBAL.log_slave_updates
+0
+Warnings:
+Warning	1287	'@@log_slave_updates' is deprecated and will be removed in a future release. Please use log_replica_updates instead.
+SELECT @@GLOBAL.slave_preserve_commit_order;
+@@GLOBAL.slave_preserve_commit_order
+1
+Warnings:
+Warning	1287	'@@slave_preserve_commit_order' is deprecated and will be removed in a future release. Please use replica_preserve_commit_order instead.

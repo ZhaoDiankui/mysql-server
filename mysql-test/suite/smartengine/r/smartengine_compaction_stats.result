@@ -1,0 +1,41 @@
+DROP DATABASE IF EXISTS smartengine_compaction_stats_test;
+CREATE DATABASE smartengine_compaction_stats_test;
+USE smartengine_compaction_stats_test;
+CREATE TABLE t1(c1 int primary key, c2 int) ENGINE=SMARTENGINE;
+INSERT INTO t1 values (1, 1);
+set global smartengine_flush_memtable = on;
+level	type
+L0	DataBytes
+L0	IndexExtents
+L0	MergedOutputExtent
+L0	MergedOutputRecord
+L0	NumExtents
+L0	NumLayers
+L0	ReadGB
+L0	ReusedBlock
+L0	ReusedExtent
+L0	SizeBytes
+L0	WriteGB
+L1	DataBytes
+L1	IndexExtents
+L1	MergedOutputExtent
+L1	MergedOutputRecord
+L1	NumExtents
+L1	NumLayers
+L1	ReadGB
+L1	ReusedBlock
+L1	ReusedExtent
+L1	SizeBytes
+L1	WriteGB
+L2	DataBytes
+L2	IndexExtents
+L2	MergedOutputExtent
+L2	MergedOutputRecord
+L2	NumExtents
+L2	NumLayers
+L2	ReadGB
+L2	ReusedBlock
+L2	ReusedExtent
+L2	SizeBytes
+L2	WriteGB
+DROP DATABASE smartengine_compaction_stats_test;

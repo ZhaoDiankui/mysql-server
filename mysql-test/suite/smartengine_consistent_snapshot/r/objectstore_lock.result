@@ -1,0 +1,10 @@
+Starting the server with inconsisted objectstore id
+Occurrences of 'Failed to verify the ID of data directory in the object store' in the input file: 1
+Starting the server when data.lock does not exist
+# Remove objectsotre lock file data.lock
+Occurrences of 'lock file should exist but not' in the input file: 1
+Starting the server when data.lock exists
+# Touch objectsotre lock file data.lock
+Initialize the data directory with data.lock
+# Create an empty data directory with data.lock...
+Occurrences of 'lock file should not exist' in the input file: 1
